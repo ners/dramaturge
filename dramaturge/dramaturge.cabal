@@ -1,0 +1,74 @@
+cabal-version:       3.0
+name:                dramaturge
+version:             0.1.0.0
+synopsis:            Testing framework
+homepage:            https://github.com/ners/dramaturge/blob/main/dramaturge
+license:             Apache-2.0
+license-file:        LICENCE.md
+author:              ners
+maintainer:          ners@gmx.ch
+bug-reports:         https://github.com/ners/dramaturge/issues
+category:            Test
+build-type:          Simple
+extra-source-files:  CHANGELOG.md, README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/ners/dramaturge
+
+common common
+  default-language: GHC2021
+  ghc-options:
+    -Weverything
+    -Wno-unsafe
+    -Wno-missing-safe-haskell-mode
+    -Wno-missing-export-lists
+    -Wno-missing-import-lists
+    -Wno-missing-kind-signatures
+    -Wno-all-missed-specialisations
+
+  default-extensions:
+    ApplicativeDo
+    BlockArguments
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    ExplicitNamespaces
+    LambdaCase
+    NoImplicitPrelude
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    RecordWildCards
+    RecursiveDo
+    TypeFamilies
+    ViewPatterns
+
+  build-depends:
+    base >=4.16 && <5,
+
+library
+  import: common
+  hs-source-dirs: src
+  build-depends:
+    aeson,
+    exceptions,
+    marionette,
+    monad-validate,
+    typed-process,
+
+  exposed-modules:
+    Test.Dramaturge
+
+test-suite test
+  import: common
+  ghc-options: -threaded
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    dramaturge,
+    marionette,

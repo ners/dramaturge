@@ -1,0 +1,76 @@
+cabal-version:       3.0
+name:                marionette
+version:             0.1.0.0
+synopsis:            Marionette protocol for Firefox
+homepage:            https://github.com/ners/dramaturge/blob/main/marionette
+license:             Apache-2.0
+license-file:        LICENCE.md
+author:              ners
+maintainer:          ners@gmx.ch
+bug-reports:         https://github.com/ners/dramaturge/issues
+category:            Web
+build-type:          Simple
+extra-source-files:  CHANGELOG.md, README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/ners/dramaturge
+
+common common
+  default-language: GHC2021
+  ghc-options:
+    -Weverything
+    -Wno-unsafe
+    -Wno-missing-safe-haskell-mode
+    -Wno-missing-export-lists
+    -Wno-missing-import-lists
+    -Wno-missing-kind-signatures
+    -Wno-all-missed-specialisations
+
+  default-extensions:
+    ApplicativeDo
+    BlockArguments
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    ExplicitNamespaces
+    LambdaCase
+    NoImplicitPrelude
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    RecordWildCards
+    RecursiveDo
+    TypeFamilies
+    ViewPatterns
+
+  build-depends:
+    aeson,
+    base >=4.16 && <5,
+    bytestring,
+
+library
+  import: common
+  hs-source-dirs: src
+  build-depends:
+    base64-bytestring,
+    binary,
+    binary-parsers,
+    containers,
+    exceptions,
+    mtl,
+    network,
+    network-simple,
+    retry,
+    text,
+    unliftio,
+
+  exposed-modules:
+    Test.Marionette
+    Test.Marionette.Class
+    Test.Marionette.Client
+    Test.Marionette.Commands
+    Test.Marionette.Protocol
