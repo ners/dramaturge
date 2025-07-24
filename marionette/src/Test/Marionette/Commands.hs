@@ -4,15 +4,17 @@
 module Test.Marionette.Commands where
 
 import Control.Exception (AssertionFailed (AssertionFailed))
-import Control.Monad.Catch (throwM)
+import Control.Monad.Catch (MonadThrow, throwM)
 import Data.Aeson (FromJSON (parseJSON), KeyValue (..), ToJSON (toJSON), Value (..), (.:))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as Aeson
 import Data.ByteString (ByteString)
 import Data.ByteString.Base64 qualified as Base64
+import Data.Foldable qualified as Foldable
 import Data.Text
 import Data.Text.Encoding qualified as Text
 import GHC.Generics (Generic)
+import GHC.IsList (IsList (Item, fromList))
 import Test.Marionette.Class
 import Test.Marionette.Client
 import Test.Marionette.Protocol
@@ -38,8 +40,9 @@ data Selector
     | ByXPath Text
     deriving stock (Eq, Show, Ord)
 
-instance ToJSON Selector where
-    toJSON s = case s of
+selectorObject :: Selector -> Aeson.Object
+selectorObject s =
+    case s of
         ById t -> selector "id" t
         ByName t -> selector "name" t
         ByClass t -> selector "class name" t
@@ -48,12 +51,15 @@ instance ToJSON Selector where
         ByPartialLinkText t -> selector "partial link text" t
         ByCSS t -> selector "css selector" t
         ByXPath t -> selector "xpath" t
-      where
-        selector :: Text -> Text -> Value
-        selector sn t = Aeson.object ["using" .= sn, "value" .= t]
+  where
+    selector :: Text -> Text -> Aeson.Object
+    selector sn t = fromList ["using" .= sn, "value" .= t]
+
+instance ToJSON Selector where
+    toJSON = Aeson.Object . selectorObject
 
 -- | An opaque identifier for a web page element.
-newtype Element = Element Text
+newtype Element = Element {elementId :: Text}
     deriving stock (Eq, Ord, Show, Read)
 
 instance FromJSON Element where
@@ -67,6 +73,11 @@ instance ToJSON Element where
 --   "Marionette:GetContext": GeckoDriver.prototype.getContext,
 --   "Marionette:GetScreenOrientation": GeckoDriver.prototype.getScreenOrientation,
 --   "Marionette:GetWindowType": GeckoDriver.prototype.getWindowType,
+
+data SelectorFrom = SelectorFrom Element Selector
+
+instance ToJSON SelectorFrom where
+    toJSON (SelectorFrom Element{..} s) = Aeson.Object $ fromList ["element" .= elementId] <> selectorObject s
 
 quit :: (Marionette m) => m ()
 quit = sendCommand_ Command{command = "Marionette:Quit", parameters = Aeson.object []}
@@ -123,34 +134,51 @@ dismissAlert = sendCommand_ Command{command = "WebDriver:DismissAlert", paramete
 elementClear :: (Marionette m) => m ()
 elementClear = sendCommand_ Command{command = "WebDriver:ElementClear", parameters = Aeson.object []}
 
-elementClick :: (Marionette m) => m ()
-elementClick = sendCommand_ Command{command = "WebDriver:ElementClick", parameters = Aeson.object []}
+elementClick :: (Marionette m) => Element -> m ()
+elementClick Element{..} =
+    sendCommand_
+        Command
+            { command = "WebDriver:ElementClick"
+            , parameters = Aeson.object ["id" .= elementId]
+            }
 
-elementSendKeys :: (Marionette m) => m ()
-elementSendKeys = sendCommand_ Command{command = "WebDriver:ElementSendKeys", parameters = Aeson.object []}
+elementSendKeys :: (Marionette m) => Element -> Text -> m ()
+elementSendKeys Element{..} text =
+    sendCommand_
+        Command
+            { command = "WebDriver:ElementSendKeys"
+            , parameters = Aeson.object ["id" .= elementId, "text" .= text]
+            }
 
 executeAsyncScript :: (Marionette m) => m ()
 executeAsyncScript = sendCommand_ Command{command = "WebDriver:ExecuteAsyncScript", parameters = Aeson.object []}
 
-executeScript :: (Marionette m) => Text -> [Value] -> m ()
+executeScript :: (Marionette m, Foldable f, FromJSON a) => Text -> f Value -> m a
 executeScript script args =
-    sendCommand_
-        Command
-            { command = "WebDriver:ExecuteScript"
-            , parameters = Aeson.object ["script" .= script, "args" .= args]
-            }
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:ExecuteScript"
+                , parameters = Aeson.object ["script" .= script, "args" .= Foldable.toList args]
+                }
 
 findElement :: (Marionette m) => Selector -> m Element
 findElement selector = value <$> sendCommand Command{command = "WebDriver:FindElement", parameters = toJSON selector}
 
-findElementFromShadowRoot :: (Marionette m) => m ()
-findElementFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementFromShadowRoot", parameters = Aeson.object []}
+findElementFrom :: (Marionette m) => Element -> Selector -> m Element
+findElementFrom element selector = value <$> sendCommand Command{command = "WebDriver:FindElement", parameters = toJSON (SelectorFrom element selector)}
 
-findElements :: (Marionette m) => Selector -> m [Element]
-findElements selector = sendCommand Command{command = "WebDriver:FindElements", parameters = toJSON selector}
+-- findElementFromShadowRoot :: (Marionette m) => m ()
+-- findElementFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementFromShadowRoot", parameters = Aeson.object []}
 
-findElementsFromShadowRoot :: (Marionette m) => m ()
-findElementsFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementsFromShadowRoot", parameters = Aeson.object []}
+findElements :: (Marionette m, IsList list, Item list ~ Element) => Selector -> m list
+findElements selector = fromList <$> sendCommand Command{command = "WebDriver:FindElements", parameters = toJSON selector}
+
+findElementsFrom :: (Marionette m, IsList list, Item list ~ Element) => Element -> Selector -> m list
+findElementsFrom element selector = fromList <$> sendCommand Command{command = "WebDriver:FindElements", parameters = toJSON (SelectorFrom element selector)}
+
+-- findElementsFromShadowRoot :: (Marionette m) => m ()
+-- findElementsFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementsFromShadowRoot", parameters = Aeson.object []}
 
 forward :: (Marionette m) => m ()
 forward = sendCommand_ Command{command = "WebDriver:Forward", parameters = Aeson.object []}
@@ -179,8 +207,18 @@ getCookies = sendCommand_ Command{command = "WebDriver:GetCookies", parameters =
 getCurrentURL :: (Marionette m) => m ()
 getCurrentURL = sendCommand_ Command{command = "WebDriver:GetCurrentURL", parameters = Aeson.object []}
 
-getElementAttribute :: (Marionette m) => m ()
-getElementAttribute = sendCommand_ Command{command = "WebDriver:GetElementAttribute", parameters = Aeson.object []}
+getElementAttribute :: (Marionette m) => Text -> Element -> m (Maybe Text)
+getElementAttribute attr Element{..} =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:GetElementAttribute"
+                , parameters =
+                    Aeson.object
+                        [ "id" .= elementId
+                        , "name" .= attr
+                        ]
+                }
 
 getElementCSSValue :: (Marionette m) => m ()
 getElementCSSValue = sendCommand_ Command{command = "WebDriver:GetElementCSSValue", parameters = Aeson.object []}
@@ -188,8 +226,17 @@ getElementCSSValue = sendCommand_ Command{command = "WebDriver:GetElementCSSValu
 getElementProperty :: (Marionette m) => m ()
 getElementProperty = sendCommand_ Command{command = "WebDriver:GetElementProperty", parameters = Aeson.object []}
 
-getElementRect :: (Marionette m) => m ()
-getElementRect = sendCommand_ Command{command = "WebDriver:GetElementRect", parameters = Aeson.object []}
+data Rect = Rect
+    { x :: Float
+    , y :: Float
+    , width :: Float
+    , height :: Float
+    }
+    deriving stock (Generic, Show, Eq)
+    deriving anyclass (FromJSON)
+
+getElementRect :: (Marionette m) => Element -> m Rect
+getElementRect Element{..} = sendCommand Command{command = "WebDriver:GetElementRect", parameters = Aeson.object ["id" .= elementId]}
 
 getElementTagName :: (Marionette m) => m ()
 getElementTagName = sendCommand_ Command{command = "WebDriver:GetElementTagName", parameters = Aeson.object []}
@@ -280,7 +327,7 @@ switchToParentFrame = sendCommand_ Command{command = "WebDriver:SwitchToParentFr
 switchToWindow :: (Marionette m) => m ()
 switchToWindow = sendCommand_ Command{command = "WebDriver:SwitchToWindow", parameters = Aeson.object []}
 
-takeScreenshot :: (Marionette m) => m ByteString
+takeScreenshot :: (Marionette m, MonadThrow m) => m ByteString
 takeScreenshot =
     either (throwM . AssertionFailed) (pure . Base64.decodeLenient)
         . Aeson.parseEither (Aeson.withText "value" $ pure . Text.encodeUtf8)

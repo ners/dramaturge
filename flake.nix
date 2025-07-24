@@ -64,6 +64,7 @@
               prev.haskell.packageOverrides
               (cabalProjectOverlay project)
               (hfinal: hprev: {
+                typed-process-effectful = dontCheck (unmarkBroken hprev.typed-process-effectful);
               })
             ];
           };

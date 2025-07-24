@@ -7,6 +7,7 @@ import Control.Monad.Catch (Exception (..), MonadThrow (throwM))
 import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON), Value (..), withArray)
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as Aeson
+import Data.Bifunctor (Bifunctor (first))
 import Data.Binary (Binary (..), getWord8)
 import Data.Binary qualified as Binary
 import Data.Binary.Parser (decimal, getLazyByteString)
@@ -82,9 +83,6 @@ instance FromJSON (Message Result) where
             <$> if err == Null
                 then pure . Right $ res
                 else Left <$> parseJSON err
-
-fromResultM :: (MonadThrow m) => Result -> m Value
-fromResultM = either throwM pure
 
 data Error = Error
     { error :: Text

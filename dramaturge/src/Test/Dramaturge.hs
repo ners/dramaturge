@@ -1,26 +1,64 @@
-module Test.Dramaturge where
+{-# LANGUAGE RoleAnnotations #-}
 
-import Control.Exception (bracket)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.IO.Class (MonadIO)
+module Test.Dramaturge
+    ( module Test.Dramaturge
+    , Element
+    , Selector (..)
+    )
+where
+
+import Control.Exception (AssertionFailed (AssertionFailed))
+import Control.Monad ((>=>))
+import Control.Monad.Catch (MonadThrow (throwM))
 import Data.Aeson (ToJSON (toJSON))
-import System.Process.Typed
-import Test.Marionette.Class (Marionette)
-import Test.Marionette.Commands (Element, executeScript)
+import Data.Functor.Identity (Identity (..))
+import Data.Maybe (isJust)
+import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
+import Effectful.Dispatch.Static (SideEffects (WithSideEffects), StaticRep, evalStaticRep)
+import Effectful.Log (LogLevel)
+import GHC.IsList (IsList (Item))
+import Test.Dramaturge.Marionette
 import Prelude
 
-startFirefox :: Bool -> IO (Process () () ())
-startFirefox headless =
-    startProcess . proc "firefox" . mconcat $
-        [ ["--marionette"]
-        , ["--headless" | headless]
-        ]
+data DramaturgeConfig = DramaturgeConfig
+    { headless :: Bool
+    , logLevel :: LogLevel
+    }
 
-stopFirefox :: Process () () () -> IO ()
-stopFirefox = stopProcess
+data Dramaturge :: Effect
 
-withFirefox :: Bool -> (Process () () () -> IO a) -> IO a
-withFirefox headless = bracket (startFirefox headless) stopFirefox
+type role Dramaturge phantom phantom
 
-scrollIntoView :: (Marionette m) => Element -> m ()
-scrollIntoView element = executeScript "arguments[0].scrollIntoView({behavior: 'instant', block: 'nearest'})" [toJSON element]
+type instance DispatchOf Dramaturge = 'Static 'WithSideEffects
+
+newtype instance StaticRep Dramaturge = Dramaturge DramaturgeConfig
+
+-- runDramaturge :: (IOE :> es) => DramaturgeConfig -> Eff (Dramaturge ': es) a -> Eff es a
+-- runDramaturge conf effect = do
+--     -- session <- liftIO $ Dramaturge.runSession conf Dramaturge.getSession
+--     evalStaticRep (Dramaturge conf) effect
+--
+-- scrollIntoView :: (Dramaturge :> es) => Element -> Eff es ()
+-- scrollIntoView = executeScript "arguments[0].scrollIntoView({behavior: 'instant', block: 'nearest'})" . Identity . toJSON
+--
+-- isVisible :: (Dramaturge :> es) => Element -> Eff es Bool
+-- isVisible = executeScript "arguments[0].checkVisibility()" . Identity . toJSON
+--
+-- isDisabled :: (Dramaturge :> es) => Element -> Eff es Bool
+-- isDisabled = fmap isJust . Marionette.getElementAttribute "disabled"
+--
+-- isEnabled :: (Dramaturge :> es) => Element -> Eff es Bool
+-- isEnabled = fmap not . isDisabled
+--
+-- findAll :: (Dramaturge :> es, IsList list, Item list ~ Element) => Selector -> Eff es list
+-- findAll = Marionette.findElements
+--
+-- findOne :: (Dramaturge :> es) => Selector -> Eff es Element
+-- findOne =
+--     findAll >=> \case
+--         [e] -> pure e
+--         _ -> throwM . AssertionFailed $ "findOne: expected to find one element"
+--
+-- click :: (Dramaturge :> es) => Element -> Eff es ()
+-- click e = do
+--     Marionette.elementClick e

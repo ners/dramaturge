@@ -48,20 +48,38 @@ common common
     ViewPatterns
 
   build-depends:
+    aeson,
+    aeson-pretty,
     base >=4.16 && <5,
+    bytestring,
+    effectful,
+    text,
+    unliftio,
 
 library
   import: common
   hs-source-dirs: src
   build-depends:
-    aeson,
+    HaXPath,
+    ansi-terminal,
     exceptions,
+    log-base,
+    log-effectful,
     marionette,
+    monad-logger,
+    monad-time-effectful,
     monad-validate,
+    network-effectful,
+    retry,
+    time,
     typed-process,
+    typed-process-effectful,
 
   exposed-modules:
     Test.Dramaturge
+    Test.Dramaturge.Firefox
+    Test.Dramaturge.Log
+    Test.Dramaturge.Marionette
 
 test-suite test
   import: common
@@ -69,6 +87,17 @@ test-suite test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+  other-modules:
+    Server
   build-depends:
+    blaze-html,
+    containers,
     dramaturge,
-    marionette,
+    http-media,
+    mtl,
+    servant,
+    servant-server,
+    shakespeare,
+    stm,
+    wai-extra,
+    warp,
