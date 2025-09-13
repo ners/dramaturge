@@ -1,15 +1,22 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Main where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Reader (ReaderT (runReaderT), runReader)
-import Data.List.NonEmpty (NonEmpty)
 -- import Test.Marionette (Element, Selector (..), navigate, newSession, runMarionette)
 -- import Test.Marionette qualified as Marionette
 
+import Control.Exception (Exception (..), throwIO)
+import Control.Monad.Extra (eitherM)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Reader (ReaderT (runReaderT), runReader)
+import Control.Monad.Validate (MonadValidate (tolerate))
+import Data.List.NonEmpty (NonEmpty)
 import Effectful
+import Effectful.Error.Static (CallStack, prettyCallStack)
 import Effectful.Process (runProcess)
+import GHC.Exception (prettyCallStackLines)
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Servant (NamedRoutes, Proxy (Proxy), hoistServer, serve)
@@ -29,10 +36,19 @@ import Prelude
 --         . hoistServer (Proxy @(NamedRoutes Routes)) (`runReaderT` state)
 --         $ server
 
+instance {-# OVERLAPPING #-} (Exception e) => Show (NonEmpty (CallStack, e)) where
+    show = unlines . ("" :) . concatMap (\(cs, e) -> displayException e : drop 1 (prettyCallStackLines cs))
+
+instance (Exception e) => Exception (NonEmpty (CallStack, e))
+
 main :: IO ()
-main = runEff . runProcess . withFirefox True . runMarionette $ do
+main = eitherM throwIO pure . runEff . runProcess . withFirefox True . runMarionette $ do
     newSession
     navigate "https://example.com"
+    elementClick =<< findElement (ByXPath "//h1[contains(text(), 'Example Domain 1')]")
+    elementClick =<< findElement (ByXPath "//h1[contains(text(), 'Example Domain 2')]")
+    elementClick =<< findElement (ByXPath "//h1[contains(text(), 'Example Domain 3')]")
+    pure ()
 
 -- scrollIntoView =<< findOne (ByXPath "//h1[contains(text(), 'Example Domain')]")
 -- e <- findOne (ByXPath "//h1[contains(text(), 'Example Domain')]")

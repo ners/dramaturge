@@ -1,1 +1,4 @@
-packages: */*.cabal
+packages:
+    ./dramaturge
+    ./marionette
+    ./effectful-validate

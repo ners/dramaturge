@@ -1,14 +1,14 @@
 cabal-version:       3.0
-name:                dramaturge
+name:                effectful-validate
 version:             0.1.0.0
-synopsis:            Testing framework
-homepage:            https://github.com/ners/dramaturge/blob/main/dramaturge
+synopsis:            Effectful data validation
+homepage:            https://github.com/ners/dramaturge/blob/main/effectful-validate
 license:             Apache-2.0
 license-file:        LICENCE.md
 author:              ners
 maintainer:          ners@gmx.ch
 bug-reports:         https://github.com/ners/dramaturge/issues
-category:            Test
+category:            Web
 build-type:          Simple
 extra-source-files:  CHANGELOG.md, README.md
 
@@ -41,48 +41,30 @@ common common
     NoImplicitPrelude
     OverloadedLabels
     OverloadedRecordDot
-    OverloadedStrings
     RecordWildCards
     RecursiveDo
     TypeFamilies
     ViewPatterns
 
   build-depends:
-    aeson,
-    aeson-pretty,
-    base >=4.16 && <5,
-    bytestring,
+    base,
     effectful,
-    monad-validate,
-    text,
-    unliftio,
 
 library
   import: common
   hs-source-dirs: src
   build-depends:
-    ansi-terminal,
-    effectful-validate,
-    exceptions,
-    log-base,
-    log-effectful,
-    marionette,
-    monad-logger,
-    monad-time-effectful,
+    base,
+    effectful,
+    monad-control,
+    monad-validate,
     mtl,
-    network-effectful,
-    nonempty-containers,
-    retry,
-    time,
+    primitive,
     transformers,
-    typed-process,
-    typed-process-effectful,
-
   exposed-modules:
-    Test.Dramaturge
-    Test.Dramaturge.Firefox
-    Test.Dramaturge.Log
-    Test.Dramaturge.Marionette
+    Effectful.Validate
+  other-modules:
+    ErrorId
 
 test-suite test
   import: common
@@ -90,18 +72,6 @@ test-suite test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
-  other-modules:
-    Server
   build-depends:
-    blaze-html,
-    containers,
-    dramaturge,
-    extra,
-    http-media,
-    mtl,
-    servant,
-    servant-server,
-    shakespeare,
-    stm,
-    wai-extra,
-    warp,
+    hspec,
+    effectful-validate,
