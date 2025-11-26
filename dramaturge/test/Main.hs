@@ -18,7 +18,6 @@ import Server (Routes, State, server)
 import System.IO (hPrint, stderr)
 import Test.Dramaturge
 import Test.Dramaturge.Firefox (withFirefox)
-import Test.Dramaturge.Marionette
 import Prelude
 
 -- main = do

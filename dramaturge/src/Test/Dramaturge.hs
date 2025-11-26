@@ -2,8 +2,7 @@
 
 module Test.Dramaturge
     ( module Test.Dramaturge
-    , Element
-    , Selector (..)
+    , module Effectful.Marionette
     )
 where
 
@@ -17,7 +16,7 @@ import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
 import Effectful.Dispatch.Static (SideEffects (WithSideEffects), StaticRep, evalStaticRep)
 import Effectful.Log (LogLevel)
 import GHC.IsList (IsList (Item))
-import Test.Dramaturge.Marionette
+import Effectful.Marionette
 import Prelude
 
 data DramaturgeConfig = DramaturgeConfig

@@ -1,8 +1,8 @@
 cabal-version:       3.0
-name:                dramaturge
+name:                marionette-effectful
 version:             0.1.0.0
 synopsis:            Testing framework
-homepage:            https://github.com/ners/dramaturge/blob/main/dramaturge
+homepage:            https://github.com/ners/dramaturge/blob/main/marionette-effectuful
 license:             Apache-2.0
 license-file:        LICENCE.md
 author:              ners
@@ -47,56 +47,18 @@ common common
     TypeFamilies
     ViewPatterns
 
-  build-depends:
-    aeson,
-    aeson-pretty,
-    base >=4.16 && <5,
-    bytestring,
-    effectful,
-    text,
-    unliftio,
-
 library
   import: common
   hs-source-dirs: src
   build-depends:
-    ansi-terminal,
+    aeson,
+    base >=4.16 && <5,
+    bytestring,
+    effectful,
     exceptions,
-    log-base,
-    log-effectful,
-    marionette-effectful,
-    monad-logger,
-    monad-time-effectful,
-    monad-validate,
+    marionette,
     mtl,
-    network-effectful,
-    retry,
-    time,
-    typed-process,
-    typed-process-effectful,
+    text,
 
   exposed-modules:
-    Test.Dramaturge
-    Test.Dramaturge.Firefox
-    Test.Dramaturge.Log
-
-test-suite test
-  import: common
-  ghc-options: -threaded
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is: Main.hs
-  other-modules:
-    Server
-  build-depends:
-    blaze-html,
-    containers,
-    dramaturge,
-    http-media,
-    mtl,
-    servant,
-    servant-server,
-    shakespeare,
-    stm,
-    wai-extra,
-    warp,
+    Effectful.Marionette

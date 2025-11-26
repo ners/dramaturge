@@ -11,32 +11,30 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.Reader qualified as Reader
 import Control.Monad.Reader.Class (MonadReader)
-import Data.Aeson (FromJSON)
+import Data.Aeson (AesonException (AesonException), FromJSON)
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types qualified as Aeson
-import Data.Bifunctor (Bifunctor (first))
 import Data.Binary (Binary)
 import Data.Binary qualified as Binary
 import Data.Binary.Get qualified as Binary
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder.Extra qualified as ByteString
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (..))
 import Data.IntMap.Strict qualified as IntMap
-import Data.Text qualified as Text
 import Debug.Trace (traceM)
+import GHC.Stack (HasCallStack)
 import Network.Simple.TCP (HostName, ServiceName, SockAddr, Socket, closeSock, connectSock, sendLazy)
 import Network.Socket.ByteString (recv)
 import Test.Marionette.Protocol
 import UnliftIO
     ( MonadUnliftIO
+    , TMVar
     , TQueue
     , async
     , bracket
-    , concurrently_
     , link
     , mapConcurrently
-    , mapConcurrently_
     , race
     , race_
     , readTMVar
@@ -100,16 +98,15 @@ newtype UnexpectedResult = UnexpectedResult Result
     deriving stock (Show)
     deriving anyclass (Exception)
 
-parseResult :: (FromJSON a) => Result -> Either Error a
-parseResult = (first aesonError . Aeson.parseEither Aeson.parseJSON =<<)
-  where
-    aesonError (Text.pack -> e) = Error{stacktrace = mempty, message = e, error = e}
+parseResult :: forall m a. (MonadThrow m, FromJSON a) => Result -> m (Either Error a)
+parseResult =
+    either (pure . Left) $
+        either (throwM . AesonException) (pure . Right)
+            . Aeson.parseEither (Aeson.parseJSON @a)
 
-data CommandWithCallback m = CommandWithCallback Command (Result -> m ())
+data CommandWithCallback = CommandWithCallback Command (TMVar Result)
 
-type role CommandWithCallback representational
-
-newtype MarionetteT m a = MarionetteT {runMarionetteT :: ReaderT (TQueue (CommandWithCallback (MarionetteT m))) m a}
+newtype MarionetteT m a = MarionetteT {runMarionetteT :: ReaderT (TQueue CommandWithCallback) m a}
     deriving newtype
         ( Functor
         , Applicative
@@ -119,45 +116,38 @@ newtype MarionetteT m a = MarionetteT {runMarionetteT :: ReaderT (TQueue (Comman
         , MonadMask
         , MonadIO
         , MonadUnliftIO
-        , MonadReader (TQueue (CommandWithCallback (MarionetteT m)))
+        , MonadReader (TQueue CommandWithCallback)
         )
 
 type role MarionetteT representational nominal
 
-getSendQueue :: (Monad m) => MarionetteT m (TQueue (CommandWithCallback (MarionetteT m)))
+getSendQueue :: (Monad m) => MarionetteT m (TQueue CommandWithCallback)
 getSendQueue = Reader.ask
 
 class (Functor m) => MarionetteClient m where
-    sendCommand' :: CommandWithCallback m -> m ()
+    sendCommand :: (HasCallStack, FromJSON a) => Command -> m a
 
-    sendCommands' :: (Traversable t) => t (CommandWithCallback m) -> m ()
-    default sendCommands' :: (Applicative m, Traversable t) => t (CommandWithCallback m) -> m ()
-    sendCommands' = traverse_ sendCommand'
-
-    sendCommand :: (FromJSON a) => Command -> m a
-    default sendCommand :: (MonadIO m, MonadThrow m, FromJSON a) => Command -> m a
-    sendCommand command = do
-        result <- newEmptyTMVarIO
-        sendCommand' . CommandWithCallback command $ atomically . putTMVar result
-        either throwM pure . parseResult =<< atomically (readTMVar result)
-
-    sendCommands :: (Traversable t, FromJSON a) => t Command -> m (t a)
-    default sendCommands :: (MonadUnliftIO m, Traversable t, FromJSON a) => t Command -> m (t a)
+    sendCommands :: (HasCallStack, Traversable t, FromJSON a) => t Command -> m (t a)
+    default sendCommands :: (HasCallStack, MonadUnliftIO m, Traversable t, FromJSON a) => t Command -> m (t a)
     sendCommands = mapConcurrently sendCommand
 
-    sendCommands_ :: (Traversable t) => t Command -> m ()
+    sendCommands_ :: (HasCallStack, Traversable t) => t Command -> m ()
     sendCommands_ = void . sendCommands @_ @_ @Aeson.Value
 
-    sendCommand_ :: Command -> m ()
+    sendCommand_ :: (HasCallStack) => Command -> m ()
     sendCommand_ = sendCommands_ . Identity
 
 instance (MonadUnliftIO m, MonadThrow m) => MarionetteClient (MarionetteT m) where
-    sendCommand' :: CommandWithCallback (MarionetteT m) -> MarionetteT m ()
-    sendCommand' command = atomically . flip writeTQueue command =<< Reader.ask
+    sendCommand :: (HasCallStack, FromJSON a) => Command -> MarionetteT m a
+    sendCommand command = do
+        q <- Reader.ask
+        result <- newEmptyTMVarIO
+        atomically . writeTQueue q $ CommandWithCallback command result
+        either throwM pure =<< parseResult =<< atomically (readTMVar result)
 
 runMarionette :: forall m a. (MonadUnliftIO m, MonadMask m) => MarionetteT m a -> m a
 runMarionette action = do
-    sendQueue :: TQueue (CommandWithCallback (MarionetteT m)) <- newTQueueIO
+    sendQueue :: TQueue CommandWithCallback <- newTQueueIO
     pendingCommands <- newTVarIO mempty
     let handleIncoming :: MarionetteMessage -> MarionetteT m ()
         handleIncoming message = do
@@ -165,8 +155,10 @@ runMarionette action = do
             decodeMarionetteM message >>= \Message{..} ->
                 atomically (stateTVar pendingCommands $ IntMap.updateLookupWithKey (\_ _ -> Nothing) messageId) >>= \case
                     Nothing -> throwM . UnexpectedResult $ messageContent
-                    Just (f, timeout) -> killThread timeout >> f messageContent
-    let handleCommand :: Socket -> Int -> CommandWithCallback (MarionetteT m) -> MarionetteT m ()
+                    Just (result, timeout) -> do
+                        killThread timeout
+                        atomically $ putTMVar result messageContent
+    let handleCommand :: Socket -> Int -> CommandWithCallback -> MarionetteT m ()
         handleCommand socket messageId (CommandWithCallback messageContent callback) = do
             let message = MarionetteMessage . Aeson.encode $ Message{..}
             traceM $ "> " <> show message

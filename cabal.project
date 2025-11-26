@@ -1,1 +1,1 @@
-packages: */*.cabal
+packages: dramaturge marionette marionette-effectful

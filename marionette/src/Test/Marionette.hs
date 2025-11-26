@@ -1,6 +1,3 @@
-{-# LANGUAGE RoleAnnotations #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 module Test.Marionette
     ( module Test.Marionette.Class
     , module Test.Marionette.Client
