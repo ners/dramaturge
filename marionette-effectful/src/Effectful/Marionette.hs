@@ -243,8 +243,8 @@ getElementAttribute = (m .) . Marionette.getElementAttribute
 -- getElementCSSValue :: (HasCallStack, Marionette :> es) => Eff es ()
 -- getElementCSSValue = sendCommand_ Command{command = "WebDriver:GetElementCSSValue", parameters = Aeson.object []}
 --
--- getElementProperty :: (HasCallStack, Marionette :> es) => Eff es ()
--- getElementProperty = sendCommand_ Command{command = "WebDriver:GetElementProperty", parameters = Aeson.object []}
+getElementProperty :: (HasCallStack, Marionette :> es) => Text -> Element -> Eff es (Maybe Text)
+getElementProperty = (m .) . Marionette.getElementProperty
 --
 -- getElementRect :: (HasCallStack, Marionette :> es) => Element -> Eff es Rect
 -- getElementRect Element{..} = sendCommand Command{command = "WebDriver:GetElementRect", parameters = Aeson.object ["id" .= elementId]}

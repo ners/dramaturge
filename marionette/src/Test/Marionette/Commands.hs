@@ -230,8 +230,18 @@ getElementAttribute attr Element{..} =
 getElementCSSValue :: (HasCallStack, Marionette m) => m ()
 getElementCSSValue = sendCommand_ Command{command = "WebDriver:GetElementCSSValue", parameters = Aeson.object []}
 
-getElementProperty :: (HasCallStack, Marionette m) => m ()
-getElementProperty = sendCommand_ Command{command = "WebDriver:GetElementProperty", parameters = Aeson.object []}
+getElementProperty :: (HasCallStack, Marionette m) => Text -> Element -> m (Maybe Text)
+getElementProperty prop Element{..} =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:GetElementProperty"
+                , parameters =
+                    Aeson.object
+                        [ "id" .= elementId
+                        , "name" .= prop
+                        ]
+                }
 
 data Rect = Rect
     { x :: Float
