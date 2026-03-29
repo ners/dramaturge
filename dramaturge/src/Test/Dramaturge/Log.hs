@@ -95,14 +95,19 @@ withLogger logLevel act = withRunInIO \unlift -> do
   where
     lock = unsafePerformIO $ newTMVarIO ()
     showLogLevel :: LogLevel -> String
-    showLogLevel LogInfo = "     INFO"
-    showLogLevel LogTrace = "    TRACE"
     showLogLevel LogAttention = "ATTENTION"
+    showLogLevel LogInfo = "INFO     "
+    showLogLevel LogTrace = "TRACE    "
 
 runLog :: (IOE :> es) => LogLevel -> Eff (Log ': es) a -> Eff es a
-runLog logLevel action = withLogger logLevel \logger -> Effectful.Log.runLog "hs-test" logger logLevel action
+runLog logLevel action = withLogger logLevel \logger -> Effectful.Log.runLog "dramaturge" logger logLevel action
 
-logMessage :: (HasCallStack, Log :> es) => LogLevel -> Text -> Value -> Eff es ()
+logMessage
+    :: (HasCallStack, Log :> es)
+    => LogLevel
+    -> Text
+    -> Value
+    -> Eff es ()
 logMessage logLevel t v =
     Effectful.Log.logMessage logLevel t $
         toJSON

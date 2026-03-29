@@ -31,7 +31,9 @@ newtype MarionetteMessage = MarionetteMessage LazyByteString
 
 instance Binary MarionetteMessage where
     put :: MarionetteMessage -> Binary.Put
-    put (MarionetteMessage lbs) = putLazyByteString $ (fromString . show . LazyByteString.length $ lbs) <> ":" <> lbs
+    put (MarionetteMessage lbs) =
+        putLazyByteString $
+            (fromString . show . LazyByteString.length $ lbs) <> ":" <> lbs
     get :: Binary.Get MarionetteMessage
     get = do
         len <- decimal

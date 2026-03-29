@@ -26,10 +26,21 @@ import GHC.Generics (Generic)
 import Network.HTTP.Media ((//), (/:))
 import Servant
 import Servant.Server.Generic
-import Text.Blaze.Html (ToMarkup (toMarkup), preEscapedLazyText, preEscapedString, preEscapedText, text)
+import Text.Blaze.Html
+    ( ToMarkup (toMarkup)
+    , preEscapedLazyText
+    , preEscapedString
+    , preEscapedText
+    , text
+    )
 import Text.Blaze.Html.Renderer.Pretty (renderHtml)
 import Text.Hamlet (Html, hamlet, shamlet)
-import Text.Julius (RawJS (rawJS), julius, renderJavascript, renderJavascriptUrl)
+import Text.Julius
+    ( RawJS (rawJS)
+    , julius
+    , renderJavascript
+    , renderJavascriptUrl
+    )
 import UnliftIO.STM (TVar, atomically, readTVar, readTVarIO, stateTVar)
 import Prelude
 
@@ -43,7 +54,8 @@ data ApiRoutes mode = ApiRoutes
     { getAll :: mode :- Get '[JSON] [(Int, Value)]
     , getOne :: mode :- Capture "id" Int :> Get '[JSON] (Int, Value)
     , post :: mode :- ReqBody '[JSON, Text] Value :> Post '[JSON] (Int, Value)
-    , put :: mode :- Capture "id" Int :> ReqBody '[JSON] Value :> Put '[JSON] (Int, Value)
+    , put
+        :: mode :- Capture "id" Int :> ReqBody '[JSON] Value :> Put '[JSON] (Int, Value)
     , deleteOne :: mode :- Capture "id" Int :> Delete '[JSON] (Int, Value)
     , deleteAll :: mode :- Delete '[JSON] [(Int, Value)]
     }
@@ -54,7 +66,9 @@ type State = TVar (IntMap Value)
 instance ToMarkup Value where
     toMarkup = text . Text.decodeUtf8 . LazyByteString.toStrict . Aeson.encodePretty
 
-server :: (MonadIO m, MonadReader State m, MonadError ServerError m) => Routes (AsServerT m)
+server
+    :: (MonadIO m, MonadReader State m, MonadError ServerError m)
+    => Routes (AsServerT m)
 server =
     Routes
         { index = do
@@ -84,19 +98,36 @@ server =
         , api =
             ApiRoutes
                 { getAll = withMap_ IntMap.toList
-                , getOne = \i -> maybe (throwError err404) (pure . (i,)) =<< withMap_ (IntMap.lookup i)
+                , getOne = \i ->
+                    maybe (throwError err404) (pure . (i,)) =<< withMap_ (IntMap.lookup i)
                 , post = \v -> withMap \m ->
                     let i = maybe 1 (succ . fst) . IntMap.lookupMax $ m
                      in ((i, v), IntMap.insert i v m)
-                , put = \i v -> withMap \m -> ((i, v), IntMap.insert i v m)
-                , deleteOne = \i -> maybe (throwError err404) (pure . (i,)) =<< withMap (IntMap.updateLookupWithKey (\_ _ -> Nothing) i)
-                , deleteAll = withMap \m -> (IntMap.toList m, mempty)
+                , put = \i v -> withMap \m ->
+                    ((i, v), IntMap.insert i v m)
+                , deleteOne = \i ->
+                    maybe (throwError err404) (pure . (i,))
+                        =<< withMap
+                            ( IntMap.updateLookupWithKey
+                                ( \_ _ ->
+                                    Nothing
+                                )
+                                i
+                            )
+                , deleteAll = withMap \m ->
+                    (IntMap.toList m, mempty)
                 }
         }
   where
-    withMap_ :: (MonadIO m, MonadReader State m) => (IntMap Value -> a) -> m a
+    withMap_
+        :: (MonadIO m, MonadReader State m)
+        => (IntMap Value -> a)
+        -> m a
     withMap_ f = fmap f . readTVarIO =<< Reader.ask
-    withMap :: (MonadIO m, MonadReader State m) => (IntMap Value -> (a, IntMap Value)) -> m a
+    withMap
+        :: (MonadIO m, MonadReader State m)
+        => (IntMap Value -> (a, IntMap Value))
+        -> m a
     withMap f = Reader.ask >>= atomically . flip stateTVar f
 
 instance Accept Html where
@@ -106,9 +137,15 @@ instance Accept Text where
     contentTypes _ = pure $ "text" // "plain" /: ("charset", "utf-8")
 
 instance MimeRender Html Html where
-    mimeRender :: Proxy Html -> Html -> LazyByteString
+    mimeRender
+        :: Proxy Html
+        -> Html
+        -> LazyByteString
     mimeRender _ = LazyByteString.fromStrict . Text.encodeUtf8 . Text.pack . renderHtml
 
 instance MimeUnrender Text Value where
-    mimeUnrender :: Proxy Text -> LazyByteString -> Either String Value
+    mimeUnrender
+        :: Proxy Text
+        -> LazyByteString
+        -> Either String Value
     mimeUnrender _ = Right . Aeson.String . Text.decodeUtf8 . LazyByteString.toStrict

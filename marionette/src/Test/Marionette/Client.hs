@@ -6,7 +6,14 @@ module Test.Marionette.Client where
 
 import Control.Exception (AssertionFailed (AssertionFailed))
 import Control.Monad (forever, void, (<=<))
-import Control.Monad.Catch (Exception (..), MonadCatch, MonadMask, MonadThrow, catchAll, throwM)
+import Control.Monad.Catch
+    ( Exception (..)
+    , MonadCatch
+    , MonadMask
+    , MonadThrow
+    , catchAll
+    , throwM
+    )
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.Reader qualified as Reader
@@ -24,7 +31,15 @@ import Data.Functor.Identity (Identity (..))
 import Data.IntMap.Strict qualified as IntMap
 import Debug.Trace (traceM)
 import GHC.Stack (HasCallStack)
-import Network.Simple.TCP (HostName, ServiceName, SockAddr, Socket, closeSock, connectSock, sendLazy)
+import Network.Simple.TCP
+    ( HostName
+    , ServiceName
+    , SockAddr
+    , Socket
+    , closeSock
+    , connectSock
+    , sendLazy
+    )
 import Network.Socket.ByteString (recv)
 import Test.Marionette.Protocol
 import UnliftIO
@@ -68,7 +83,11 @@ newtype DecodeError = DecodeError String
     deriving stock (Show)
     deriving anyclass (Exception)
 
-incoming :: forall m a. (MonadUnliftIO m, MonadThrow m, Binary a) => Socket -> m (TQueue a)
+incoming
+    :: forall m a
+     . (MonadUnliftIO m, MonadThrow m, Binary a)
+    => Socket
+    -> m (TQueue a)
 incoming socket = do
     q <- newTQueueIO
     link =<< async (go (atomically . writeTQueue q) (newDecoder ""))
@@ -82,10 +101,22 @@ incoming socket = do
         go f $ newDecoder rest
     go f dec =
         go f . (dec `Binary.pushChunk`)
-            =<< liftIO (recv socket ByteString.defaultChunkSize `catchAll` \_ -> throwM SocketClosed)
+            =<< liftIO
+                (recv socket ByteString.defaultChunkSize `catchAll` \_ -> throwM SocketClosed)
 
-connect :: (MonadUnliftIO m) => HostName -> ServiceName -> ((Socket, SockAddr) -> m a) -> m a
-connect host port = bracket (recoverAll (limitRetriesByCumulativeDelay 5_000_000 $ constantDelay 50_000) . const $ connectSock host port) (closeSock . fst)
+connect
+    :: (MonadUnliftIO m)
+    => HostName
+    -> ServiceName
+    -> ((Socket, SockAddr) -> m a)
+    -> m a
+connect host port =
+    bracket
+        ( recoverAll (limitRetriesByCumulativeDelay 5_000_000 $ constantDelay 50_000)
+            . const
+            $ connectSock host port
+        )
+        (closeSock . fst)
 
 mapQueue_ :: (MonadIO m) => (a -> m ()) -> TQueue a -> m ()
 mapQueue_ f = forever . f <=< atomically . readTQueue
@@ -98,7 +129,11 @@ newtype UnexpectedResult = UnexpectedResult Result
     deriving stock (Show)
     deriving anyclass (Exception)
 
-parseResult :: forall m a. (MonadThrow m, FromJSON a) => Result -> m (Either Error a)
+parseResult
+    :: forall m a
+     . (MonadThrow m, FromJSON a)
+    => Result
+    -> m (Either Error a)
 parseResult =
     either (pure . Left) $
         either (throwM . AesonException) (pure . Right)
@@ -127,8 +162,14 @@ getSendQueue = Reader.ask
 class (Functor m) => MarionetteClient m where
     sendCommand :: (HasCallStack, FromJSON a) => Command -> m a
 
-    sendCommands :: (HasCallStack, Traversable t, FromJSON a) => t Command -> m (t a)
-    default sendCommands :: (HasCallStack, MonadUnliftIO m, Traversable t, FromJSON a) => t Command -> m (t a)
+    sendCommands
+        :: (HasCallStack, Traversable t, FromJSON a)
+        => t Command
+        -> m (t a)
+    default sendCommands
+        :: (HasCallStack, MonadUnliftIO m, Traversable t, FromJSON a)
+        => t Command
+        -> m (t a)
     sendCommands = mapConcurrently sendCommand
 
     sendCommands_ :: (HasCallStack, Traversable t) => t Command -> m ()
@@ -145,7 +186,11 @@ instance (MonadUnliftIO m, MonadThrow m) => MarionetteClient (MarionetteT m) whe
         atomically . writeTQueue q $ CommandWithCallback command result
         either throwM pure =<< parseResult =<< atomically (readTMVar result)
 
-runMarionette :: forall m a. (MonadUnliftIO m, MonadMask m) => MarionetteT m a -> m a
+runMarionette
+    :: forall m a
+     . (MonadUnliftIO m, MonadMask m)
+    => MarionetteT m a
+    -> m a
 runMarionette action = do
     sendQueue :: TQueue CommandWithCallback <- newTQueueIO
     pendingCommands <- newTVarIO mempty
@@ -153,11 +198,15 @@ runMarionette action = do
         handleIncoming message = do
             traceM $ "< " <> show message
             decodeMarionetteM message >>= \Message{..} ->
-                atomically (stateTVar pendingCommands $ IntMap.updateLookupWithKey (\_ _ -> Nothing) messageId) >>= \case
-                    Nothing -> throwM . UnexpectedResult $ messageContent
-                    Just (result, timeout) -> do
-                        killThread timeout
-                        atomically $ putTMVar result messageContent
+                atomically
+                    ( stateTVar pendingCommands $
+                        IntMap.updateLookupWithKey (\_ _ -> Nothing) messageId
+                    )
+                    >>= \case
+                        Nothing -> throwM . UnexpectedResult $ messageContent
+                        Just (result, timeout) -> do
+                            killThread timeout
+                            atomically $ putTMVar result messageContent
     let handleCommand :: Socket -> Int -> CommandWithCallback -> MarionetteT m ()
         handleCommand socket messageId (CommandWithCallback messageContent callback) = do
             let message = MarionetteMessage . Aeson.encode $ Message{..}
@@ -166,8 +215,10 @@ runMarionette action = do
             timeout <- forkIO do
                 threadDelay 5_000_000
                 throwM . MarionetteTimeout $ message
-            atomically . modifyTVar' pendingCommands $ IntMap.insert messageId (callback, timeout)
-    let runSocket =
+            atomically . modifyTVar' pendingCommands $
+                IntMap.insert messageId (callback, timeout)
+        runSocket :: MarionetteT m ()
+        runSocket =
             connect "localhost" "2828" \(socket, _) -> do
                 incomingQueue <- incoming socket
                 void . decodeMarionetteM @_ @Greeting =<< atomically (readTQueue incomingQueue)

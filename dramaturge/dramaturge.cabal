@@ -1,19 +1,21 @@
-cabal-version:       3.0
-name:                dramaturge
-version:             0.1.0.0
-synopsis:            Testing framework
-homepage:            https://github.com/ners/dramaturge/blob/main/dramaturge
-license:             Apache-2.0
-license-file:        LICENCE.md
-author:              ners
-maintainer:          ners@gmx.ch
-bug-reports:         https://github.com/ners/dramaturge/issues
-category:            Test
-build-type:          Simple
-extra-source-files:  CHANGELOG.md, README.md
+cabal-version: 3.0
+name: dramaturge
+version: 0.1.0.0
+synopsis: Testing framework
+homepage: https://github.com/ners/dramaturge/blob/main/dramaturge
+license: Apache-2.0
+license-file: LICENCE.md
+author: ners
+maintainer: ners@gmx.ch
+bug-reports: https://github.com/ners/dramaturge/issues
+category: Test
+build-type: Simple
+extra-source-files:
+  CHANGELOG.md
+  README.md
 
 source-repository head
-  type:     git
+  type: git
   location: https://github.com/ners/dramaturge
 
 common common
@@ -88,6 +90,7 @@ test-suite test
   main-is: Main.hs
   other-modules:
     Server
+
   build-depends:
     blaze-html,
     containers,

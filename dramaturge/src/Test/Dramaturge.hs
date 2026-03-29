@@ -13,10 +13,14 @@ import Data.Aeson (ToJSON (toJSON))
 import Data.Functor.Identity (Identity (..))
 import Data.Maybe (isJust)
 import Effectful (Dispatch (Static), DispatchOf, Eff, Effect, IOE, (:>))
-import Effectful.Dispatch.Static (SideEffects (WithSideEffects), StaticRep, evalStaticRep)
+import Effectful.Dispatch.Static
+    ( SideEffects (WithSideEffects)
+    , StaticRep
+    , evalStaticRep
+    )
 import Effectful.Log (LogLevel)
-import GHC.IsList (IsList (Item))
 import Effectful.Marionette
+import GHC.IsList (IsList (Item))
 import Prelude
 
 data DramaturgeConfig = DramaturgeConfig

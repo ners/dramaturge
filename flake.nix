@@ -21,30 +21,20 @@
           (file: any file.hasExt [ "cabal" "hs" "md" ])
           root;
       };
-      ghcsFor = pkgs: with lib; foldlAttrs
-        (acc: name: hp':
-          let
-            hp = tryEval hp';
-            version = getVersion hp.value.ghc;
-            majorMinor = versions.majorMinor version;
-            ghcName = "ghc${replaceStrings ["."] [""] majorMinor}";
-          in
-          if hp.value ? ghc && ! acc ? ${ghcName} && versionAtLeast version "9.4" && versionOlder version "9.13"
-          then acc // { ${ghcName} = hp.value; }
-          else acc
-        )
-        { }
-        pkgs.haskell.packages;
-      hpsFor = pkgs: { default = pkgs.haskellPackages; } // ghcsFor pkgs;
-      pnames = map (path: baseNameOf (dirOf path)) (lib.fileset.toList (lib.fileset.fileFilter (file: file.hasExt "cabal") ./.));
-      haskell-overlay = final: prev: with prev.haskell.lib.compose; lib.composeManyExtensions [
-        (hfinal: hprev: lib.genAttrs pnames (pname: hfinal.callCabal2nix pname (sourceFilter ./${pname}) { }))
+      projects =
+        with lib;
+        genAttrs'
+          (fileset.toList (fileset.fileFilter (file: file.hasExt "cabal") ./.))
+          (file: nameValuePair (removeSuffix ".cabal" (baseNameOf file)) (dirOf file));
+      pnames = attrNames projects;
+      haskell-overlay = pkgs: with pkgs.haskell.lib.compose; lib.composeManyExtensions [
+        (hfinal: hprev: lib.mapAttrs (pname: dir: hfinal.callCabal2nix pname (sourceFilter dir) { }) projects)
         (hfinal: hprev: {
           typed-process-effectful = dontCheck (doJailbreak (unmarkBroken hprev.typed-process-effectful));
           # We skip the check because Firefox fails to launch with
           # Fontconfig error: No writable cache directories
           # Should this test tool depend be a runtime depend, so that users of the library get it as well?
-          dramaturge = dontCheck (addTestToolDepend prev.firefox hprev.dramaturge);
+          dramaturge = dontCheck (addTestToolDepend pkgs.firefox hprev.dramaturge);
         })
         (hfinal: hprev: lib.optionalAttrs (lib.versionAtLeast hprev.ghc.version "9.12") {
           HList = doJailbreak hprev.HList;
@@ -55,7 +45,7 @@
           haskell = prev.haskell // {
             packageOverrides = lib.composeManyExtensions [
               prev.haskell.packageOverrides
-              (haskell-overlay final prev)
+              (haskell-overlay prev)
             ];
           };
         })
@@ -68,52 +58,77 @@
       };
     }
     //
-    foreach inputs.nixpkgs.legacyPackages
-      (system: pkgs':
-        let
-          pkgs = pkgs'.extend overlay;
-          hps = hpsFor pkgs;
-          pname = "dramaturge";
-          libs = pkgs.buildEnv {
-            name = "${pname}-libs";
-            paths =
-              lib.mapCartesianProduct
-                ({ hp, pname }: hp.${pname})
-                { hp = attrValues hps; pname = pnames; };
-            pathsToLink = [ "/lib" ];
-          };
-          docs = pkgs.buildEnv {
-            name = "${pname}-docs";
-            paths = map (pname: pkgs.haskell.lib.documentationTarball hps.default.${pname}) pnames;
-          };
-          sdist = pkgs.buildEnv {
-            name = "${pname}-sdist";
-            paths = map (pname: pkgs.haskell.lib.sdistTarball hps.default.${pname}) pnames;
-          };
-          docsAndSdist = pkgs.linkFarm "${pname}-docsAndSdist" { inherit docs sdist; };
-        in
-        {
-          formatter.${system} = pkgs.nixpkgs-fmt;
-          legacyPackages.${system} = pkgs;
-          packages.${system}.default = pkgs.symlinkJoin {
-            name = "${pname}-all";
-            paths = [ libs docsAndSdist ];
-            inherit (hps.default.syntax) meta;
-          };
-          devShells.${system} =
-            foreach hps (ghcName: hp: {
-              ${ghcName} = hp.shellFor {
-                packages = ps: map (pname: ps.${pname}) pnames;
-                nativeBuildInputs = with pkgs'; with haskellPackages; [
-                  cabal-install
-                  cabal-gild
-                  fourmolu
-                  firefox
-                ] ++ lib.optionals (lib.versionAtLeast (lib.getVersion hp.ghc) "9.4") [
-                  hp.haskell-language-server
-                ];
-              };
-            });
-        }
-      );
+    foreach inputs.nixpkgs.legacyPackages (system: pkgs':
+      let
+        pkgs = pkgs'.extend overlay;
+        hps = with lib; foldlAttrs
+          (acc: name: hp':
+            let
+              hp = tryEval hp';
+              version = getVersion hp.value.ghc;
+              majorMinor = versions.majorMinor version;
+              ghcName = "ghc${replaceStrings ["."] [""] majorMinor}";
+            in
+            if hp.value ? ghc && ! acc ? ${ghcName} && versionAtLeast version "9.4" && versionOlder version "9.13"
+            then acc // { ${ghcName} = hp.value; }
+            else acc
+          )
+          { default = pkgs.haskellPackages; }
+          pkgs.haskell.packages;
+        pname = "dramaturge";
+        libs = pkgs.buildEnv {
+          name = "${pname}-libs";
+          paths =
+            lib.mapCartesianProduct
+              ({ hp, pname }: hp.${pname})
+              { hp = attrValues hps; pname = pnames; };
+          pathsToLink = [ "/lib" ];
+        };
+        docs = pkgs.buildEnv {
+          name = "${pname}-docs";
+          paths = map (pname: pkgs.haskell.lib.documentationTarball hps.default.${pname}) pnames;
+        };
+        sdist = pkgs.buildEnv {
+          name = "${pname}-sdist";
+          paths = map (pname: pkgs.haskell.lib.sdistTarball hps.default.${pname}) pnames;
+        };
+        docsAndSdist = pkgs.linkFarm "${pname}-docsAndSdist" { inherit docs sdist; };
+      in
+      {
+        legacyPackages.${system} = pkgs;
+        packages.${system}.default = pkgs.symlinkJoin {
+          name = "${pname}-all";
+          paths = [ libs docsAndSdist ];
+          inherit (hps.default.syntax) meta;
+        };
+        devShells.${system} =
+          foreach hps (ghcName: hp: {
+            ${ghcName} = hp.shellFor {
+              packages = ps: map (pname: ps.${pname}) pnames;
+              nativeBuildInputs = with pkgs'; with haskellPackages; [
+                cabal-install
+                cabal-gild
+                fourmolu
+                firefox
+              ] ++ lib.optionals (lib.versionAtLeast (lib.getVersion hp.ghc) "9.4") [
+                hp.haskell-language-server
+              ];
+            };
+          });
+        formatter.${system} = pkgs.writeShellApplication {
+          name = "formatter";
+          runtimeInputs = with pkgs; with haskellPackages; [
+            cabal-gild
+            fd
+            fourmolu
+            nixpkgs-fmt
+          ];
+          text = ''
+            fd --extension=nix -X nixpkgs-fmt
+            fd --extension=hs -X fourmolu -i
+            fd --extension=cabal -x cabal-gild --io
+          '';
+        };
+      }
+    );
 }

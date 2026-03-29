@@ -31,7 +31,15 @@ import Effectful
     , (:>)
     )
 import Effectful.Concurrent.Async (mapConcurrently, runConcurrent)
-import Effectful.Concurrent.STM (Concurrent, TMVar, TQueue, atomically, newEmptyTMVarIO, readTMVar, writeTQueue)
+import Effectful.Concurrent.STM
+    ( Concurrent
+    , TMVar
+    , TQueue
+    , atomically
+    , newEmptyTMVarIO
+    , readTMVar
+    , writeTQueue
+    )
 import Effectful.Dispatch.Static
     ( SideEffects (WithSideEffects)
     , StaticRep
@@ -55,9 +63,14 @@ import Test.Marionette.Protocol qualified as Marionette
 import Prelude
 
 instance {-# OVERLAPPING #-} (Error Marionette.Error :> es) => MonadError Marionette.Error (Eff es) where
-    throwError :: Marionette.Error -> Eff es a
+    throwError
+        :: Marionette.Error
+        -> Eff es a
     throwError = Error.throwError
-    catchError :: Eff es a -> (Marionette.Error -> Eff es a) -> Eff es a
+    catchError
+        :: Eff es a
+        -> (Marionette.Error -> Eff es a)
+        -> Eff es a
     catchError v = Error.catchError v . const
 
 instance
@@ -72,7 +85,9 @@ instance
         q <- Reader.ask
         result :: TMVar Marionette.Result <- newEmptyTMVarIO
         atomically . writeTQueue q $ CommandWithCallback command result
-        either Error.throwError pure =<< Marionette.parseResult =<< atomically (readTMVar result)
+        either Error.throwError pure
+            =<< Marionette.parseResult
+            =<< atomically (readTMVar result)
     sendCommands = mapConcurrently sendCommand
 
 data Marionette :: Effect
@@ -85,9 +100,10 @@ newtype instance StaticRep Marionette = Marionette (TQueue CommandWithCallback)
 
 runMarionette :: (IOE :> es) => Eff (Marionette ': es) a -> Eff es a
 runMarionette action =
-    withEffToIO (ConcUnlift Ephemeral (Limited 1)) \unlift -> Marionette.runMarionette do
-        sendQueue <- Marionette.getSendQueue
-        liftIO . unlift . evalStaticRep (Marionette sendQueue) . inject $ action
+    withEffToIO (ConcUnlift Ephemeral (Limited 1)) \unlift ->
+        Marionette.runMarionette do
+            sendQueue <- Marionette.getSendQueue
+            liftIO . unlift . evalStaticRep (Marionette sendQueue) . inject $ action
 
 m
     :: (HasCallStack, Marionette :> es')
@@ -175,15 +191,27 @@ elementClick :: (HasCallStack, Marionette :> es) => Element -> Eff es ()
 elementClick = m . Marionette.elementClick
 
 --
-elementSendKeys :: (HasCallStack, Marionette :> es) => Element -> Text -> Eff es ()
+elementSendKeys
+    :: (HasCallStack, Marionette :> es)
+    => Element
+    -> Text
+    -> Eff es ()
 elementSendKeys = (m .) . Marionette.elementSendKeys
 
 --
-executeAsyncScript :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a) => Text -> f Value -> Eff es (Maybe a)
+executeAsyncScript
+    :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a)
+    => Text
+    -> f Value
+    -> Eff es (Maybe a)
 executeAsyncScript = (m .) . Marionette.executeAsyncScript
 
 --
-executeScript :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a) => Text -> f Value -> Eff es a
+executeScript
+    :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a)
+    => Text
+    -> f Value
+    -> Eff es a
 executeScript = (m .) . Marionette.executeScript
 
 --
@@ -191,7 +219,11 @@ findElement :: (HasCallStack, Marionette :> es) => Selector -> Eff es Element
 findElement = m . Marionette.findElement
 
 --
-findElementFrom :: (HasCallStack, Marionette :> es) => Element -> Selector -> Eff es Element
+findElementFrom
+    :: (HasCallStack, Marionette :> es)
+    => Element
+    -> Selector
+    -> Eff es Element
 findElementFrom = (m .) . Marionette.findElementFrom
 
 --
@@ -236,15 +268,24 @@ getCurrentURL = m Marionette.getCurrentURL
 
 -- getCurrentURL = sendCommand_ Command{command = "WebDriver:GetCurrentURL", parameters = Aeson.object []}
 --
-getElementAttribute :: (HasCallStack, Marionette :> es) => Text -> Element -> Eff es (Maybe Text)
+getElementAttribute
+    :: (HasCallStack, Marionette :> es)
+    => Text
+    -> Element
+    -> Eff es (Maybe Text)
 getElementAttribute = (m .) . Marionette.getElementAttribute
 
 --
 -- getElementCSSValue :: (HasCallStack, Marionette :> es) => Eff es ()
 -- getElementCSSValue = sendCommand_ Command{command = "WebDriver:GetElementCSSValue", parameters = Aeson.object []}
 --
-getElementProperty :: (HasCallStack, Marionette :> es) => Text -> Element -> Eff es (Maybe Text)
+getElementProperty
+    :: (HasCallStack, Marionette :> es)
+    => Text
+    -> Element
+    -> Eff es (Maybe Text)
 getElementProperty = (m .) . Marionette.getElementProperty
+
 --
 -- getElementRect :: (HasCallStack, Marionette :> es) => Element -> Eff es Rect
 -- getElementRect Element{..} = sendCommand Command{command = "WebDriver:GetElementRect", parameters = Aeson.object ["id" .= elementId]}
