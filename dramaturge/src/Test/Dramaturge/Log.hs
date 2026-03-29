@@ -1,7 +1,9 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Dramaturge.Log
     ( Log
+    , LogLevel (..)
     , runLog
     , logTrace
     , logTrace_

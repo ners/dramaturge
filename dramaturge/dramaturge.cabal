@@ -63,6 +63,7 @@ library
   hs-source-dirs: src
   build-depends:
     ansi-terminal,
+    data-default,
     exceptions,
     log-base,
     log-effectful,
@@ -79,6 +80,7 @@ library
 
   exposed-modules:
     Test.Dramaturge
+    Test.Dramaturge.Config
     Test.Dramaturge.Firefox
     Test.Dramaturge.Log
 

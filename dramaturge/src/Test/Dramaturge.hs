@@ -21,12 +21,8 @@ import Effectful.Dispatch.Static
 import Effectful.Log (LogLevel)
 import Effectful.Marionette
 import GHC.IsList (IsList (Item))
+import Test.Dramaturge.Config (Config)
 import Prelude
-
-data DramaturgeConfig = DramaturgeConfig
-    { headless :: Bool
-    , logLevel :: LogLevel
-    }
 
 data Dramaturge :: Effect
 
@@ -34,7 +30,7 @@ type role Dramaturge phantom phantom
 
 type instance DispatchOf Dramaturge = 'Static 'WithSideEffects
 
-newtype instance StaticRep Dramaturge = Dramaturge DramaturgeConfig
+newtype instance StaticRep Dramaturge = Dramaturge Config
 
 -- runDramaturge :: (IOE :> es) => DramaturgeConfig -> Eff (Dramaturge ': es) a -> Eff es a
 -- runDramaturge conf effect = do
