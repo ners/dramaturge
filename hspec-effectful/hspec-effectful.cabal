@@ -1,8 +1,8 @@
 cabal-version: 3.0
-name: dramaturge
+name: hspec-effectful
 version: 0.1.0.0
-synopsis: Testing framework
-homepage: https://github.com/ners/dramaturge/blob/main/dramaturge
+synopsis: Effectful driver for Hspec
+homepage: https://github.com/ners/dramaturge/blob/main/hspec-effectuful
 license: Apache-2.0
 license-file: LICENCE.md
 author: ners
@@ -28,7 +28,6 @@ common common
     -Wno-missing-import-lists
     -Wno-missing-kind-signatures
     -Wno-all-missed-specialisations
-    -Wno-missing-role-annotations
 
   default-extensions:
     ApplicativeDo
@@ -50,62 +49,14 @@ common common
     TypeFamilies
     ViewPatterns
 
-  build-depends:
-    aeson,
-    aeson-pretty,
-    base >=4.16 && <5,
-    bytestring,
-    effectful,
-    text,
-    unliftio,
-
 library
   import: common
   hs-source-dirs: src
   build-depends:
-    ansi-terminal,
-    data-default,
-    exceptions,
-    extra,
-    hspec-effectful,
-    log-base,
-    log-effectful,
-    marionette-effectful,
-    monad-logger,
-    monad-time-effectful,
-    monad-validate,
-    mtl,
-    network-effectful,
-    retry,
-    these,
-    time,
-    typed-process,
-    typed-process-effectful,
+    HUnit,
+    base >=4.16 && <5,
+    effectful,
+    hspec-expectations,
 
   exposed-modules:
-    Test.Dramaturge
-    Test.Dramaturge.Config
-    Test.Dramaturge.Firefox
-    Test.Dramaturge.Log
-
-test-suite test
-  import: common
-  ghc-options: -threaded
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is: Main.hs
-  other-modules:
-    Server
-
-  build-depends:
-    blaze-html,
-    containers,
-    dramaturge,
-    http-media,
-    mtl,
-    servant,
-    servant-server,
-    shakespeare,
-    stm,
-    wai-extra,
-    warp,
+    Effectful.Hspec

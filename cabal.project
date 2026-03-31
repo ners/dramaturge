@@ -1,1 +1,1 @@
-packages: dramaturge marionette marionette-effectful
+packages: dramaturge marionette marionette-effectful hspec-effectful

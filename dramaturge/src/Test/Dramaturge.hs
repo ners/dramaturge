@@ -10,6 +10,7 @@ module Test.Dramaturge
     , module Effectful.Exception
     , module Effectful.FileSystem
     , module Effectful.FileSystem.IO.ByteString
+    , module Effectful.Hspec
     , module Effectful.Marionette
     , module Effectful.Process.Typed
     , module Effectful.Timeout
@@ -31,6 +32,7 @@ import Effectful.Concurrent.Async (concurrently)
 import Effectful.Exception (Exception (..), SomeException, catch, try)
 import Effectful.FileSystem (FileSystem, runFileSystem)
 import Effectful.FileSystem.IO.ByteString (writeFile)
+import Effectful.Hspec
 import Effectful.Marionette
 import Effectful.Process.Typed
 import Effectful.Timeout (Timeout, runTimeout, timeout)
@@ -44,8 +46,9 @@ runDramaturge
     :: (IOE :> es)
     => Config
     -> Eff
-        ( FileSystem
-            ': Concurrent
+        ( Concurrent
+            ': FileSystem
+            ': Hspec
             ': Timeout
             ': TypedProcess
             ': Log
@@ -55,8 +58,9 @@ runDramaturge
         a
     -> Eff es a
 runDramaturge Config{..} =
-    runFileSystem
-        . runConcurrent
+    runConcurrent
+        . runFileSystem
+        . runHspec
         . runTimeout
         . runTypedProcess
         . withFirefox firefox
