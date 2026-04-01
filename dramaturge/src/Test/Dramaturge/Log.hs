@@ -27,14 +27,14 @@ import Data.Text qualified as Text
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Effectful (Eff, IOE, MonadUnliftIO, withRunInIO, (:>))
 import Effectful.Log hiding
-    ( runLog
+    ( logAttention
+    , logAttention_
+    , logInfo
+    , logInfo_
     , logMessage
     , logTrace
     , logTrace_
-    , logInfo
-    , logInfo_
-    , logAttention
-    , logAttention_
+    , runLog
     )
 import Effectful.Log qualified
 import GHC.Exception (prettyCallStackLines)

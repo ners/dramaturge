@@ -23,8 +23,6 @@ import Control.Monad.Catch (MonadThrow (throwM))
 import Control.Monad.Extra (untilJustM)
 import Data.Aeson (ToJSON (toJSON))
 import Data.String (fromString)
-import Data.Text (Text)
-import Data.Text.Encoding qualified as Text
 import Data.These (These (..))
 import Effectful
 import Effectful.Concurrent (Concurrent, runConcurrent, threadDelay)
@@ -152,15 +150,6 @@ findTheseElems
 findTheseElems s1 s2 = do
     logTraceShow_ (s1, s2)
     withFrozenCallStack $ tryThese (findElement s1) (findElement s2)
-
-getSource :: (HasCallStack, Marionette :> es) => Eff es Text
-getSource = executeScript "return new XMLSerializer().serializeToString(document);" []
-
-saveSource
-    :: (HasCallStack, FileSystem :> es, Marionette :> es)
-    => FilePath
-    -> Eff es ()
-saveSource f = writeFile f . Text.encodeUtf8 =<< getSource
 
 scrollIntoView
     :: (HasCallStack, Marionette :> es, Log :> es)

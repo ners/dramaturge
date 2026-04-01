@@ -51,6 +51,7 @@ import Effectful.Error.Static (Error, runError)
 import Effectful.Error.Static qualified as Error
 import Effectful.Reader.Static (Reader, runReader)
 import Effectful.Reader.Static qualified as Reader
+import GHC.IsList (IsList (..))
 import GHC.Stack (HasCallStack)
 import Test.Marionette.Client
     ( CommandWithCallback (CommandWithCallback)
@@ -129,31 +130,6 @@ m action = do
 quit :: (HasCallStack, Marionette :> es) => Eff es ()
 quit = m Marionette.quit
 
--- data WebDriver :: Effect
---
--- type role WebDriver phantom phantom
---
--- type instance DispatchOf WebDriver = 'Static 'WithSideEffects
---
--- newtype instance StaticRep WebDriver = WebDriver WDSession
---
--- instance WebDriver.WDSessionState (Eff (WebDriver ': es)) where
---     getSession = coerce <$> getStaticRep @WebDriver
---     putSession = putStaticRep . WebDriver
---
--- instance (IOE :> es) => WebDriver.WebDriver (Eff (WebDriver ': es)) where
---     doCommand = ((wd .) .) . WebDriver.doCommand
---
--- runWebDriver :: (IOE :> es) => WDConfig -> Eff (WebDriver ': es) a -> Eff es a
--- runWebDriver conf effect = do
---     session <- liftIO $ WebDriver.runSession conf WebDriver.getSession
---     evalStaticRep (WebDriver session) $ WebDriver.finallyClose effect
---
--- wd :: (WebDriver :> es) => WD a -> Eff es a
--- wd wd = do
---     WebDriver session <- getStaticRep
---     unsafeEff_ $ WebDriver.runWD session wd
-
 -- acceptAlert :: (HasCallStack, Marionette :> es) => Eff es ()
 -- acceptAlert = sendCommand_ Command{command = "WebDriver:AcceptAlert", parameters = Aeson.object []}
 --
@@ -163,8 +139,9 @@ quit = m Marionette.quit
 -- addCookie :: (HasCallStack, Marionette :> es) => Eff es ()
 -- addCookie = sendCommand_ Command{command = "WebDriver:AddCookie", parameters = Aeson.object []}
 --
--- back :: (HasCallStack, Marionette :> es) => Eff es ()
--- back = sendCommand_ Command{command = "WebDriver:Back", parameters = Aeson.object []}
+back :: (HasCallStack, Marionette :> es) => Eff es ()
+back = m Marionette.back
+
 --
 -- closeChromeWindow :: (HasCallStack, Marionette :> es) => Eff es ()
 -- closeChromeWindow = sendCommand_ Command{command = "WebDriver:CloseChromeWindow", parameters = Aeson.object []}
@@ -178,8 +155,9 @@ quit = m Marionette.quit
 -- deleteCookie :: (HasCallStack, Marionette :> es) => Eff es ()
 -- deleteCookie = sendCommand_ Command{command = "WebDriver:DeleteCookie", parameters = Aeson.object []}
 --
--- deleteSession :: (HasCallStack, Marionette :> es) => Eff es ()
--- deleteSession = sendCommand_ Command{command = "WebDriver:DeleteSession", parameters = Aeson.object []}
+deleteSession :: (HasCallStack, Marionette :> es) => Eff es ()
+deleteSession = m Marionette.deleteSession
+
 --
 -- dismissAlert :: (HasCallStack, Marionette :> es) => Eff es ()
 -- dismissAlert = sendCommand_ Command{command = "WebDriver:DismissAlert", parameters = Aeson.object []}
@@ -190,7 +168,6 @@ quit = m Marionette.quit
 elementClick :: (HasCallStack, Marionette :> es) => Element -> Eff es ()
 elementClick = m . Marionette.elementClick
 
---
 elementSendKeys
     :: (HasCallStack, Marionette :> es)
     => Element
@@ -198,7 +175,6 @@ elementSendKeys
     -> Eff es ()
 elementSendKeys = (m .) . Marionette.elementSendKeys
 
---
 executeAsyncScript
     :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a)
     => Text
@@ -206,7 +182,6 @@ executeAsyncScript
     -> Eff es (Maybe a)
 executeAsyncScript = (m .) . Marionette.executeAsyncScript
 
---
 executeScript
     :: (HasCallStack, Marionette :> es, Foldable f, FromJSON a)
     => Text
@@ -214,11 +189,9 @@ executeScript
     -> Eff es a
 executeScript = (m .) . Marionette.executeScript
 
---
 findElement :: (HasCallStack, Marionette :> es) => Selector -> Eff es Element
 findElement = m . Marionette.findElement
 
---
 findElementFrom
     :: (HasCallStack, Marionette :> es)
     => Element
@@ -229,18 +202,25 @@ findElementFrom = (m .) . Marionette.findElementFrom
 --
 -- -- findElementFromShadowRoot :: (HasCallStack, Marionette :> es) => Eff es ()
 -- -- findElementFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementFromShadowRoot", parameters = Aeson.object []}
---
--- findElements :: (HasCallStack, Marionette :> es, IsList list, Item list ~ Element) => Selector -> Eff es list
--- findElements selector = fromList <$> sendCommand Command{command = "WebDriver:FindElements", parameters = toJSON selector}
---
--- findElementsFrom :: (HasCallStack, Marionette :> es, IsList list, Item list ~ Element) => Element -> Selector -> Eff es list
--- findElementsFrom element selector = fromList <$> sendCommand Command{command = "WebDriver:FindElements", parameters = toJSON (SelectorFrom element selector)}
+
+findElements
+    :: (HasCallStack, Marionette :> es, IsList list, Item list ~ Element)
+    => Selector
+    -> Eff es list
+findElements = m . Marionette.findElements
+
+findElementsFrom
+    :: (HasCallStack, Marionette :> es, IsList list, Item list ~ Element)
+    => Element -> Selector -> Eff es list
+findElementsFrom = (m .) . Marionette.findElementsFrom
+
 --
 -- -- findElementsFromShadowRoot :: (HasCallStack, Marionette :> es) => Eff es ()
 -- -- findElementsFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementsFromShadowRoot", parameters = Aeson.object []}
 --
--- forward :: (HasCallStack, Marionette :> es) => Eff es ()
--- forward = sendCommand_ Command{command = "WebDriver:Forward", parameters = Aeson.object []}
+forward :: (HasCallStack, Marionette :> es) => Eff es ()
+forward = m Marionette.forward
+
 --
 -- fullscreenWindow :: (HasCallStack, Marionette :> es) => Eff es ()
 -- fullscreenWindow = sendCommand_ Command{command = "WebDriver:FullscreenWindow", parameters = Aeson.object []}
@@ -266,8 +246,6 @@ findElementFrom = (m .) . Marionette.findElementFrom
 getCurrentURL :: (HasCallStack, Marionette :> es) => Eff es Text
 getCurrentURL = m Marionette.getCurrentURL
 
--- getCurrentURL = sendCommand_ Command{command = "WebDriver:GetCurrentURL", parameters = Aeson.object []}
---
 getElementAttribute
     :: (HasCallStack, Marionette :> es)
     => Text
@@ -296,9 +274,9 @@ getElementProperty = (m .) . Marionette.getElementProperty
 getElementText :: (HasCallStack, Marionette :> es) => Element -> Eff es Text
 getElementText = m . Marionette.getElementText
 
---
--- getPageSource :: (HasCallStack, Marionette :> es) => Eff es ()
--- getPageSource = sendCommand_ Command{command = "WebDriver:GetPageSource", parameters = Aeson.object []}
+getPageSource :: (HasCallStack, Marionette :> es) => Eff es Text
+getPageSource = m Marionette.getPageSource
+
 --
 -- getShadowRoot :: (HasCallStack, Marionette :> es) => Eff es ()
 -- getShadowRoot = sendCommand_ Command{command = "WebDriver:GetShadowRoot", parameters = Aeson.object []}
@@ -306,8 +284,9 @@ getElementText = m . Marionette.getElementText
 -- getTimeouts :: (HasCallStack, Marionette :> es) => Eff es ()
 -- getTimeouts = sendCommand_ Command{command = "WebDriver:GetTimeouts", parameters = Aeson.object []}
 --
--- getTitle :: (HasCallStack, Marionette :> es) => Eff es ()
--- getTitle = sendCommand_ Command{command = "WebDriver:GetTitle", parameters = Aeson.object []}
+getTitle :: (HasCallStack, Marionette :> es) => Eff es Text
+getTitle = m Marionette.getTitle
+
 --
 -- getWindowHandle :: (HasCallStack, Marionette :> es) => Eff es ()
 -- getWindowHandle = sendCommand_ Command{command = "WebDriver:GetWindowHandle", parameters = Aeson.object []}
@@ -336,11 +315,9 @@ getElementText = m . Marionette.getElementText
 navigate :: (HasCallStack, Marionette :> es) => Text -> Eff es ()
 navigate = m . Marionette.navigate
 
---
 newSession :: (HasCallStack, Marionette :> es) => Eff es ()
 newSession = m Marionette.newSession
 
---
 -- newWindow :: (HasCallStack, Marionette :> es) => Eff es ()
 -- newWindow = sendCommand_ Command{command = "WebDriver:NewWindow", parameters = Aeson.object []}
 --

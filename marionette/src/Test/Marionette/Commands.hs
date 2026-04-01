@@ -360,10 +360,11 @@ getElementText Element{..} =
                 , parameters = Aeson.object ["id" .= elementId]
                 }
 
-getPageSource :: (HasCallStack, Marionette m) => m ()
+getPageSource :: (HasCallStack, Marionette m) => m Text
 getPageSource =
-    sendCommand_
-        Command{command = "WebDriver:GetPageSource", parameters = Aeson.object []}
+    value
+        <$> sendCommand
+            Command{command = "WebDriver:GetPageSource", parameters = Aeson.object []}
 
 getShadowRoot :: (HasCallStack, Marionette m) => m ()
 getShadowRoot =
@@ -375,10 +376,11 @@ getTimeouts =
     sendCommand_
         Command{command = "WebDriver:GetTimeouts", parameters = Aeson.object []}
 
-getTitle :: (HasCallStack, Marionette m) => m ()
+getTitle :: (HasCallStack, Marionette m) => m Text
 getTitle =
-    sendCommand_
-        Command{command = "WebDriver:GetTitle", parameters = Aeson.object []}
+    value
+        <$> sendCommand
+            Command{command = "WebDriver:GetTitle", parameters = Aeson.object []}
 
 getWindowHandle :: (HasCallStack, Marionette m) => m ()
 getWindowHandle =
