@@ -2,9 +2,9 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Dramaturge.Log
-    ( Log
-    , LogLevel (..)
+    ( module Effectful.Log
     , runLog
+    , logMessage
     , logTrace
     , logTrace_
     , logTraceShow_
@@ -26,7 +26,16 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Format.ISO8601 (iso8601Show)
 import Effectful (Eff, IOE, MonadUnliftIO, withRunInIO, (:>))
-import Effectful.Log (Log, LogLevel (..), LogMessage (..), Logger)
+import Effectful.Log hiding
+    ( runLog
+    , logMessage
+    , logTrace
+    , logTrace_
+    , logInfo
+    , logInfo_
+    , logAttention
+    , logAttention_
+    )
 import Effectful.Log qualified
 import GHC.Exception (prettyCallStackLines)
 import GHC.Generics (Generic)
