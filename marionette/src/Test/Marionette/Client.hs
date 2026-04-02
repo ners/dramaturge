@@ -5,7 +5,7 @@
 module Test.Marionette.Client where
 
 import Control.Exception (AssertionFailed (AssertionFailed))
-import Control.Monad (forever, void, (<=<))
+import Control.Monad (forever, void, when, (<=<))
 import Control.Monad.Catch
     ( Exception (..)
     , MonadCatch
@@ -29,6 +29,7 @@ import Data.ByteString.Builder.Extra qualified as ByteString
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (..))
 import Data.IntMap.Strict qualified as IntMap
+import Data.Maybe (isJust)
 import Debug.Trace (traceM)
 import GHC.Stack (HasCallStack)
 import Network.Simple.TCP
@@ -55,6 +56,7 @@ import UnliftIO
     , readTMVar
     )
 import UnliftIO.Concurrent (forkIO, killThread, threadDelay)
+import UnliftIO.Environment (lookupEnv)
 import UnliftIO.Retry (constantDelay, limitRetriesByCumulativeDelay, recoverAll)
 import UnliftIO.STM
     ( atomically
@@ -196,7 +198,8 @@ runMarionette action = do
     pendingCommands <- newTVarIO mempty
     let handleIncoming :: MarionetteMessage -> MarionetteT m ()
         handleIncoming message = do
-            traceM $ "< " <> show message
+            lookupEnv "MARIONETTE_DEBUG" >>= flip (when . isJust) do
+                traceM $ "< " <> show message
             decodeMarionetteM message >>= \Message{..} ->
                 atomically
                     ( stateTVar pendingCommands $
@@ -210,7 +213,8 @@ runMarionette action = do
     let handleCommand :: Socket -> Int -> CommandWithCallback -> MarionetteT m ()
         handleCommand socket messageId (CommandWithCallback messageContent callback) = do
             let message = MarionetteMessage . Aeson.encode $ Message{..}
-            traceM $ "> " <> show message
+            lookupEnv "MARIONETTE_DEBUG" >>= flip (when . isJust) do
+                traceM $ "> " <> show message
             liftIO . sendLazy socket . Binary.encode $ message
             timeout <- forkIO do
                 threadDelay 5_000_000
