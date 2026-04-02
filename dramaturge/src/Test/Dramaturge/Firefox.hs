@@ -51,4 +51,7 @@ withFirefox Config{..} action =
     bracketOnError
         (startFirefox program headless)
         (when closeOnError . stopProcess)
-        $ (action <*) . when closeWhenDone . stopProcess
+        \process -> do
+            a <- action
+            when closeWhenDone $ stopProcess process
+            pure a
