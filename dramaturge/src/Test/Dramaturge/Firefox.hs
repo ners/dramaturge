@@ -10,7 +10,9 @@ import System.Process.Typed (Process)
 import Prelude
 
 data Config = Config
-    { headless :: Bool
+    { program :: FilePath
+    -- ^ The path of the Firefox executable, or its name in the PATH.
+    , headless :: Bool
     -- ^ Run Firefox without a visible UI. Defaults to 'True'.
     , closeOnError :: Bool
     -- ^ Stop the Firefox process if an exception is raised. Defaults to 'True'.
@@ -22,15 +24,20 @@ data Config = Config
 instance Default Config where
     def =
         Config
-            { headless = True
+            { program = "firefox"
+            , headless = True
             , closeOnError = True
             , closeWhenDone = True
             }
 
 -- | Start a Firefox process with Marionette enabled. The caller is responsible for stopping the process.
-startFirefox :: (TypedProcess :> es) => Bool -> Eff es (Process () () ())
-startFirefox headless =
-    startProcess . proc "firefox" . mconcat $
+startFirefox
+    :: (TypedProcess :> es)
+    => FilePath
+    -> Bool
+    -> Eff es (Process () () ())
+startFirefox program headless =
+    startProcess . proc program . mconcat $
         [ ["--marionette"]
         , ["--headless" | headless]
         ]
@@ -42,6 +49,6 @@ startFirefox headless =
 withFirefox :: (TypedProcess :> es) => Config -> Eff es a -> Eff es a
 withFirefox Config{..} action =
     bracketOnError
-        (startFirefox headless)
+        (startFirefox program headless)
         (when closeOnError . stopProcess)
         $ (action <*) . when closeWhenDone . stopProcess
