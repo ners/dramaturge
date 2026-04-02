@@ -7,6 +7,7 @@ module Test.Dramaturge
     , module Test.Dramaturge.Config
     , module Effectful.Concurrent
     , module Effectful.Concurrent.Async
+    , module Effectful.Environment
     , module Effectful.Exception
     , module Effectful.FileSystem
     , module Effectful.FileSystem.IO.ByteString
@@ -27,6 +28,7 @@ import Data.These (These (..))
 import Effectful
 import Effectful.Concurrent (Concurrent, runConcurrent, threadDelay)
 import Effectful.Concurrent.Async (concurrently)
+import Effectful.Environment hiding (setEnv)
 import Effectful.Exception (Exception (..), SomeException, catch, try)
 import Effectful.FileSystem (FileSystem, runFileSystem)
 import Effectful.FileSystem.IO.ByteString (writeFile)
@@ -45,6 +47,7 @@ runDramaturge
     => Config
     -> Eff
         ( Concurrent
+            ': Environment
             ': FileSystem
             ': Hspec
             ': Timeout
@@ -57,6 +60,7 @@ runDramaturge
     -> Eff es a
 runDramaturge Config{..} =
     runConcurrent
+        . runEnvironment
         . runFileSystem
         . runHspec
         . runTimeout
