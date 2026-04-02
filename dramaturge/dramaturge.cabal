@@ -71,15 +71,8 @@ library
     log-base,
     log-effectful,
     marionette-effectful,
-    monad-logger,
-    monad-time-effectful,
-    monad-validate,
-    mtl,
-    network-effectful,
-    retry,
     these,
     time,
-    typed-process,
     typed-process-effectful,
 
   exposed-modules:
@@ -108,5 +101,6 @@ test-suite test
     servant-server,
     shakespeare,
     stm,
+    typed-process,
     wai-extra,
     warp,
