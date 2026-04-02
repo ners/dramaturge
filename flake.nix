@@ -27,6 +27,7 @@
           (fileset.toList (fileset.fileFilter (file: file.hasExt "cabal") ./.))
           (file: nameValuePair (removeSuffix ".cabal" (baseNameOf file)) (dirOf file));
       pnames = attrNames projects;
+      libPnames = filter (pname: !lib.elem pname [ "tourist" ]) pnames;
       haskell-overlay = pkgs: with pkgs.haskell.lib.compose; lib.composeManyExtensions [
         (hfinal: hprev: lib.mapAttrs (pname: dir: hfinal.callCabal2nix pname (sourceFilter dir) { }) projects)
         (hfinal: hprev: {
@@ -35,6 +36,13 @@
           # Fontconfig error: No writable cache directories
           # Should this test tool depend be a runtime depend, so that users of the library get it as well?
           dramaturge = dontCheck (addTestToolDepend pkgs.firefox hprev.dramaturge);
+          tourist = hprev.tourist.overrideAttrs (attrs: {
+            nativeBuildInputs = [ pkgs.makeWrapper ] ++ attrs.nativeBuildInputs or [ ];
+            postInstall = ''
+              ${attrs.postInstall or ""}
+              wrapProgram "$out"/bin/tourist --prefix PATH : "${lib.makeBinPath [pkgs.firefox]}"
+            '';
+          });
         })
         (hfinal: hprev: lib.optionalAttrs (lib.versionAtLeast hprev.ghc.version "9.12") {
           HList = doJailbreak hprev.HList;
@@ -48,6 +56,7 @@
               (haskell-overlay prev)
             ];
           };
+          inherit (final.haskellPackages) tourist;
         })
       ];
     in
@@ -81,16 +90,16 @@
           paths =
             lib.mapCartesianProduct
               ({ hp, pname }: hp.${pname})
-              { hp = attrValues hps; pname = pnames; };
+              { hp = attrValues hps; pname = libPnames; };
           pathsToLink = [ "/lib" ];
         };
         docs = pkgs.buildEnv {
           name = "${pname}-docs";
-          paths = map (pname: pkgs.haskell.lib.documentationTarball hps.default.${pname}) pnames;
+          paths = map (pname: pkgs.haskell.lib.documentationTarball hps.default.${pname}) libPnames;
         };
         sdist = pkgs.buildEnv {
           name = "${pname}-sdist";
-          paths = map (pname: pkgs.haskell.lib.sdistTarball hps.default.${pname}) pnames;
+          paths = map (pname: pkgs.haskell.lib.sdistTarball hps.default.${pname}) libPnames;
         };
         docsAndSdist = pkgs.linkFarm "${pname}-docsAndSdist" { inherit docs sdist; };
       in

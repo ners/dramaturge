@@ -1,0 +1,81 @@
+cabal-version: 3.0
+name: tourist
+version: 0.1.0.0
+synopsis: Visits every site and brings back souvenirs
+homepage: https://github.com/ners/dramaturge/blob/main/tourist
+license: Apache-2.0
+license-file: LICENCE.md
+author: ners
+maintainer: ners@gmx.ch
+bug-reports: https://github.com/ners/dramaturge/issues
+category: Web
+build-type: Simple
+extra-source-files:
+  CHANGELOG.md
+  README.md
+
+source-repository head
+  type: git
+  location: https://github.com/ners/dramaturge
+
+common common
+  default-language: GHC2021
+  ghc-options:
+    -Weverything
+    -Wno-unsafe
+    -Wno-missing-safe-haskell-mode
+    -Wno-missing-export-lists
+    -Wno-missing-import-lists
+    -Wno-missing-kind-signatures
+    -Wno-all-missed-specialisations
+
+  default-extensions:
+    ApplicativeDo
+    BlockArguments
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    ExplicitNamespaces
+    LambdaCase
+    NoImplicitPrelude
+    OverloadedLabels
+    OverloadedRecordDot
+    OverloadedStrings
+    QuasiQuotes
+    RecordWildCards
+    RecursiveDo
+    StrictData
+    TypeFamilies
+    ViewPatterns
+
+executable tourist
+  import: common
+  hs-source-dirs: app
+  ghc-options: -O2
+  main-is: Main.hs
+  autogen-modules:
+    Paths_tourist
+
+  other-modules:
+    Config
+    Itinerary
+    Paths_tourist
+
+  build-depends:
+    base,
+    containers,
+    data-default,
+    dramaturge,
+    effectful,
+    exceptions,
+    extra,
+    filepath,
+    generic-lens,
+    lens,
+    modern-uri,
+    optparse-applicative,
+    text,
+    unordered-containers,
