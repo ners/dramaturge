@@ -6,7 +6,9 @@ import Effectful
 import Effectful.Exception (bracketOnError)
 import Effectful.Process.Typed (TypedProcess, proc, startProcess, stopProcess)
 import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 import System.Process.Typed (Process)
+import Test.Dramaturge.Log
 import Prelude
 
 data Config = Config
@@ -46,12 +48,24 @@ startFirefox program headless =
 --
 -- Firefox is started before the action and stopped afterward according to
 -- the 'Config' flags.
-withFirefox :: (TypedProcess :> es) => Config -> Eff es a -> Eff es a
+withFirefox
+    :: (HasCallStack, TypedProcess :> es, Log :> es)
+    => Config
+    -> Eff es a
+    -> Eff es a
 withFirefox Config{..} action =
     bracketOnError
-        (startFirefox program headless)
-        (when closeOnError . stopProcess)
+        ( do
+            logInfo_ "Starting Firefox process"
+            startFirefox program headless
+        )
+        ( \process -> when closeOnError do
+            logInfo_ "Stopping Firefox process on error"
+            stopProcess process
+        )
         \process -> do
             a <- action
-            when closeWhenDone $ stopProcess process
+            when closeWhenDone do
+                logInfo_ "Stopping Firefox process"
+                stopProcess process
             pure a
