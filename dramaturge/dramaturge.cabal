@@ -87,6 +87,7 @@ library
     Test.Dramaturge.Config
     Test.Dramaturge.Firefox
     Test.Dramaturge.Log
+    Test.Dramaturge.TypedProcess
 
 test-suite test
   import: common

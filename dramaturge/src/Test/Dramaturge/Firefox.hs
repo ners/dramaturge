@@ -1,13 +1,27 @@
 module Test.Dramaturge.Firefox where
 
 import Control.Monad (when)
+import Control.Monad.Extra (fromMaybeM)
+import Data.Coerce (coerce)
 import Data.Default (Default (..))
+import Data.Int (Int32)
 import Effectful
+import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception (bracketOnError)
-import Effectful.Process.Typed (TypedProcess, proc, startProcess, stopProcess)
+import Effectful.Process.Typed
+    ( ExitCode (..)
+    , Process
+    , TypedProcess
+    , getExitCode
+    , getPid
+    , proc
+    , startProcess
+    , stopProcess
+    , waitExitCode
+    )
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
-import System.Process.Typed (Process)
+import System.Posix.Types (CPid (CPid))
 import Test.Dramaturge.Log
 import Prelude
 
@@ -56,16 +70,31 @@ withFirefox
 withFirefox Config{..} action =
     bracketOnError
         ( do
-            logInfo_ "Starting Firefox process"
-            startFirefox program headless
+            process <- startFirefox program headless
+            pid <- unsafeEff_ (getPid process)
+            logInfo "Starting Firefox process" (cpidJson <$> pid)
+            pure process
         )
         ( \process -> when closeOnError do
-            logInfo_ "Stopping Firefox process on error"
-            stopProcess process
+            pid <- unsafeEff_ (getPid process)
+            exitCode <- ensureStopped process
+            logInfo
+                "Stopping Firefox process on error"
+                (cpidJson <$> pid, exitCodeJson exitCode)
         )
         \process -> do
             a <- action
             when closeWhenDone do
-                logInfo_ "Stopping Firefox process"
-                stopProcess process
+                pid <- unsafeEff_ (getPid process)
+                exitCode <- ensureStopped process
+                logInfo "Stopping Firefox process" (cpidJson <$> pid, exitCodeJson exitCode)
             pure a
+  where
+    ensureStopped :: (TypedProcess :> es) => Process () () () -> Eff es ExitCode
+    ensureStopped process =
+        fromMaybeM (stopProcess process >> waitExitCode process) $ getExitCode process
+    exitCodeJson :: ExitCode -> Int
+    exitCodeJson ExitSuccess = 0
+    exitCodeJson (ExitFailure i) = i
+    cpidJson :: CPid -> Int32
+    cpidJson = coerce

@@ -3,8 +3,9 @@
 
 module Test.Dramaturge
     ( module Test.Dramaturge
-    , module Test.Dramaturge.Log
     , module Test.Dramaturge.Config
+    , module Test.Dramaturge.Log
+    , module Test.Dramaturge.TypedProcess
     , module Effectful.Concurrent
     , module Effectful.Concurrent.Async
     , module Effectful.Environment
@@ -13,7 +14,6 @@ module Test.Dramaturge
     , module Effectful.FileSystem.IO.ByteString
     , module Effectful.Hspec
     , module Effectful.Marionette
-    , module Effectful.Process.Typed
     , module Effectful.Timeout
     , module GHC.Stack
     )
@@ -34,12 +34,12 @@ import Effectful.FileSystem (FileSystem, runFileSystem)
 import Effectful.FileSystem.IO.ByteString (writeFile)
 import Effectful.Hspec
 import Effectful.Marionette
-import Effectful.Process.Typed
 import Effectful.Timeout (Timeout, runTimeout, timeout)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Test.Dramaturge.Config
 import Test.Dramaturge.Firefox (withFirefox)
 import Test.Dramaturge.Log
+import Test.Dramaturge.TypedProcess
 import Prelude hiding (writeFile)
 
 runDramaturge
