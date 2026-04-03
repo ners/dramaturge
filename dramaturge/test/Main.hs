@@ -4,20 +4,19 @@ import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Reader (ReaderT (runReaderT), runReader)
-import Data.List.NonEmpty (NonEmpty)
 -- import Test.Marionette (Element, Selector (..), navigate, newSession, runMarionette)
 -- import Test.Marionette qualified as Marionette
 
+import Data.Default (def)
+import Data.List.NonEmpty (NonEmpty)
 import Effectful
-import Effectful.Process (runProcess)
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Servant (NamedRoutes, Proxy (Proxy), hoistServer, serve)
 import Servant.Server.Generic (genericServe)
 import Server (Routes, State, server)
 import System.IO (hPrint, stderr)
-import Test.Dramaturge
-import Test.Dramaturge.Firefox (withFirefox)
+import Test.Dramaturge hiding (runProcess)
 import Prelude
 
 -- main = do
@@ -29,7 +28,7 @@ import Prelude
 --         $ server
 
 main :: IO ()
-main = runEff . runProcess . withFirefox True . runMarionette $ do
+main = runEff . runDramaturge def $ do
     newSession
     navigate "https://example.com"
 

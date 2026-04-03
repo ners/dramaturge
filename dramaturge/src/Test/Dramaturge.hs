@@ -66,8 +66,8 @@ runDramaturge Config{..} =
         . runTimeout
         . runTypedProcess
         . runLog logLevel
-        . withFirefox firefox
         . runMarionette
+        . withFirefox firefox
         . inject
 
 newtype TimeoutException = TimeoutException String

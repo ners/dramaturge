@@ -22,6 +22,6 @@ readProcessStdout_ process = do
     out <- Process.readProcessStdout_ process
     logTrace (Text.pack . show $ process)
         . Text.decodeUtf8
-        . LazyByteString.toStrict $
-        out
+        . LazyByteString.toStrict
+        $ out
     pure out

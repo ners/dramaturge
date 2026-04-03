@@ -8,6 +8,8 @@ import Data.Int (Int32)
 import Effectful
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception (bracketOnError)
+import Effectful.Marionette (Marionette, quit)
+import Effectful.Marionette qualified as Marionette
 import Effectful.Process.Typed
     ( ExitCode (..)
     , Process
@@ -63,7 +65,11 @@ startFirefox program headless =
 -- Firefox is started before the action and stopped afterward according to
 -- the 'Config' flags.
 withFirefox
-    :: (HasCallStack, TypedProcess :> es, Log :> es)
+    :: ( HasCallStack
+       , TypedProcess :> es
+       , Marionette :> es
+       , Log :> es
+       )
     => Config
     -> Eff es a
     -> Eff es a
@@ -79,7 +85,7 @@ withFirefox Config{..} action =
             pid <- unsafeEff_ (getPid process)
             exitCode <- ensureStopped process
             logInfo
-                "Stopping Firefox process on error"
+                "Stopped Firefox process on error"
                 (cpidJson <$> pid, exitCodeJson exitCode)
         )
         \process -> do
@@ -87,14 +93,26 @@ withFirefox Config{..} action =
             when closeWhenDone do
                 pid <- unsafeEff_ (getPid process)
                 exitCode <- ensureStopped process
-                logInfo "Stopping Firefox process" (cpidJson <$> pid, exitCodeJson exitCode)
+                logInfo
+                    "Done. Stopped Firefox process"
+                    (cpidJson <$> pid, exitCodeJson exitCode)
             pure a
   where
-    ensureStopped :: (TypedProcess :> es) => Process () () () -> Eff es ExitCode
+    ensureStopped
+        :: ( HasCallStack
+           , TypedProcess :> es
+           , Marionette :> es
+           )
+        => Process () () () -> Eff es ExitCode
     ensureStopped process =
-        fromMaybeM (stopProcess process >> waitExitCode process) $ getExitCode process
+        flip fromMaybeM (getExitCode process) do
+            Marionette.quit
+            stopProcess process
+            waitExitCode process
+
     exitCodeJson :: ExitCode -> Int
     exitCodeJson ExitSuccess = 0
     exitCodeJson (ExitFailure i) = i
+
     cpidJson :: CPid -> Int32
     cpidJson = coerce

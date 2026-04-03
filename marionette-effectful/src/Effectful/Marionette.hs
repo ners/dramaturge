@@ -146,8 +146,9 @@ back = m Marionette.back
 -- closeChromeWindow :: (HasCallStack, Marionette :> es) => Eff es ()
 -- closeChromeWindow = sendCommand_ Command{command = "WebDriver:CloseChromeWindow", parameters = Aeson.object []}
 --
--- closeWindow :: (HasCallStack, Marionette :> es) => Eff es ()
--- closeWindow = sendCommand_ Command{command = "WebDriver:CloseWindow", parameters = Aeson.object []}
+closeWindow :: (HasCallStack, Marionette :> es) => Eff es ()
+closeWindow = m Marionette.closeWindow
+
 --
 -- deleteAllCookies :: (HasCallStack, Marionette :> es) => Eff es ()
 -- deleteAllCookies = sendCommand_ Command{command = "WebDriver:DeleteAllCookies", parameters = Aeson.object []}
