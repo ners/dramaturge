@@ -119,7 +119,6 @@
                 cabal-gild
                 fourmolu
                 firefox
-              ] ++ lib.optionals (lib.versionAtLeast (lib.getVersion hp.ghc) "9.4") [
                 hp.haskell-language-server
               ];
             };
