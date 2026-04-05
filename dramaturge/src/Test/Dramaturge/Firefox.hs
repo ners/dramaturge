@@ -8,7 +8,7 @@ import Data.Int (Int32)
 import Effectful
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception (bracketOnError)
-import Effectful.Marionette (Marionette, quit)
+import Effectful.Marionette (Marionette)
 import Effectful.Marionette qualified as Marionette
 import Effectful.Process.Typed
     ( ExitCode (..)
@@ -18,7 +18,6 @@ import Effectful.Process.Typed
     , getPid
     , proc
     , startProcess
-    , stopProcess
     , waitExitCode
     )
 import GHC.Generics (Generic)
@@ -107,7 +106,6 @@ withFirefox Config{..} action =
     ensureStopped process =
         flip fromMaybeM (getExitCode process) do
             Marionette.quit
-            stopProcess process
             waitExitCode process
 
     exitCodeJson :: ExitCode -> Int
