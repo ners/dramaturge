@@ -1,7 +1,7 @@
 module Itinerary where
 
 import Control.Lens.Combinators (filtered)
-import Control.Lens.Operators ((%~))
+import Control.Lens.Operators ((%~), (.~))
 import Data.Generics.Labels ()
 import Data.HashSet (HashSet)
 import Data.HashSet qualified as HashSet
@@ -12,6 +12,7 @@ import Effectful.State.Static.Local (State)
 import Effectful.State.Static.Local qualified as State
 import GHC.Generics (Generic)
 import Text.URI (URI)
+import Text.URI.Lens (uriFragment, uriQuery)
 import Prelude
 
 data Itinerary = Itinerary
@@ -28,7 +29,7 @@ empty =
         }
 
 push :: (State Itinerary :> es) => URI -> Eff es ()
-push uri =
+push ((uriQuery .~ []) . (uriFragment .~ Nothing) -> uri) =
     State.modify $
         filtered (not . HashSet.member uri . visited)
             %~ (#visited %~ HashSet.insert uri) . (#queue %~ (|> uri))
