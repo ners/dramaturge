@@ -1,10 +1,12 @@
 module Test.Dramaturge.Firefox where
 
 import Control.Monad (when)
-import Control.Monad.Extra (fromMaybeM)
+import Control.Monad.Extra (unlessM)
+import Data.Aeson qualified as Aeson
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Int (Int32)
+import Data.Maybe (isJust)
 import Effectful
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception (bracketOnError)
@@ -77,40 +79,36 @@ withFirefox Config{..} action =
         ( do
             process <- startFirefox program headless
             pid <- unsafeEff_ (getPid process)
-            logInfo "Starting Firefox process" (cpidJson <$> pid)
+            logInfo "Starting Firefox process" . Aeson.object $ [("pid", cpidJson pid)]
             pure process
         )
-        ( \process -> when closeOnError do
-            pid <- unsafeEff_ (getPid process)
-            exitCode <- ensureStopped process
-            logInfo
-                "Stopped Firefox process on error"
-                (cpidJson <$> pid, exitCodeJson exitCode)
-        )
+        (when closeOnError . ensureStopped)
         \process -> do
             a <- action
-            when closeWhenDone do
-                pid <- unsafeEff_ (getPid process)
-                exitCode <- ensureStopped process
-                logInfo
-                    "Done. Stopped Firefox process"
-                    (cpidJson <$> pid, exitCodeJson exitCode)
+            logInfo_ "Done"
+            when closeWhenDone $ ensureStopped process
             pure a
   where
     ensureStopped
         :: ( HasCallStack
            , TypedProcess :> es
            , Marionette :> es
+           , Log :> es
            )
-        => Process () () () -> Eff es ExitCode
+        => Process () () () -> Eff es ()
     ensureStopped process =
-        flip fromMaybeM (getExitCode process) do
+        unlessM (isJust <$> getExitCode process) do
+            pid <- unsafeEff_ (getPid process)
             Marionette.quit
-            waitExitCode process
+            exitCode <- waitExitCode process
+            logInfo "Stopped Firefox process" . Aeson.object $
+                [ ("pid", cpidJson pid)
+                , ("exitCode", exitCodeJson exitCode)
+                ]
 
-    exitCodeJson :: ExitCode -> Int
-    exitCodeJson ExitSuccess = 0
-    exitCodeJson (ExitFailure i) = i
+    exitCodeJson :: ExitCode -> Aeson.Value
+    exitCodeJson ExitSuccess = Aeson.toJSON @Int 0
+    exitCodeJson (ExitFailure i) = Aeson.toJSON i
 
-    cpidJson :: CPid -> Int32
-    cpidJson = coerce
+    cpidJson :: Maybe CPid -> Aeson.Value
+    cpidJson = maybe Aeson.Null (Aeson.toJSON . coerce @_ @Int32)
