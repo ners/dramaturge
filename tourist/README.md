@@ -40,26 +40,27 @@ Dramaturge instruments a Firefox browser via the Marionette protocol.
 The browser can be either headless or visible, if you want to tag along for the ride.
 
 The test process goes as follows:
-1. Put all user-provided pages into a queue
+1. Put all user-provided URIs into a queue
 2. Pop a page from the queue and visit it
 3. Wait for the page to populate (content inside `<body>`)
 4. Extract fully rendered HTML, screenshots, assets, ...
-5. Collect links to other local pages that have not yet been visited and put them into the queue
+5. Collect links to other local URIs that have not yet been visited and put them into the queue
 6. Repeat from step 2 until the queue is empty
 
 ## Usage
 
 ```
-tourist [OPTIONS] [URL]...
+tourist [OPTIONS] [URI]...
 ```
 
-| Option                          | Description                              | Default    |
-| ------------------------------- | ---------------------------------------- | ---------- |
-| `--headless`/`--graphical`      | Run with or without a GUI                | headless   |
-| `--quiet`/`--verbose`/`--debug` | Control log output                       | verbose    |
-| `--waitFor <SELECTOR>`          | The selector for the element to wait for | `body > *` |
-| `--output <DIR>`                | Where to write the static files          | `.`        |
-| `--firefox <FILE>`              | Path to the Firefox binary               | `firefox`  |
+| Option                          | Description                                | Default                |
+| ------------------------------- | ------------------------------------------ | ---------------------- |
+| `--headless`/`--graphical`      | Run with or without a GUI                  | headless               |
+| `--quiet`/`--verbose`/`--debug` | Control log output                         | verbose                |
+| `--waitFor <SELECTOR>`          | The selector for the element to wait for   | `body > *`             |
+| `--filter <REGEX>`              | Only follow links matching this pattern    | `^(?!\\/\\/)[^:\\s]+$` |
+| `--output <DIR>`                | Where to write the static files            | `.`                    |
+| `--firefox <FILE>`              | Path to the Firefox binary                 | `firefox`              |
 
 **tourist** likes to travel light; it does not download any browsers or driver binaries to your computer.
 All it needs is Firefox to hitch a ride in.
@@ -67,7 +68,7 @@ All it needs is Firefox to hitch a ride in.
 If using [Nix], you don't even need Firefox. Just run:
 
 ```
-nix run github:ners/dramaturge#tourist -- [OPTIONS] [URL]...
+nix run github:ners/dramaturge#tourist -- [OPTIONS] [URI]...
 ```
 
 [Dramaturge]: https://github.com/ners/dramaturge

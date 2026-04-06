@@ -1,11 +1,13 @@
 module Main where
 
 import Config (Config (..), getConfig)
+import Control.Lens.Combinators (has)
 import Control.Lens.Operators ((&), (.~), (^.))
-import Control.Monad ((>=>))
+import Control.Lens.Regex.Text (regexing)
+import Control.Monad (when, (>=>))
 import Control.Monad.Extra (whileM)
+import Data.Aeson qualified as Aeson
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Effectful
@@ -38,7 +40,8 @@ main = do
             whileM step
 
 type Tourist es =
-    ( Reader Config :> es
+    ( HasCallStack
+    , Reader Config :> es
     , State Itinerary :> es
     , Marionette :> es
     , Concurrent :> es
@@ -76,8 +79,14 @@ process uri = do
     writeFile filename . Text.encodeUtf8 =<< getPageSource
     findElements (ByTag "a")
         >>= mapM_ @[]
-            ( getElementAttribute "href" >=> \case
-                Just href | isLocalPage href -> do
+            ( getElementAttribute "href" >=> mapM_ \href -> do
+                let isLocal = has (regexing config.filter) href
+                logTrace "Found link" . Aeson.object $
+                    [ ("page", Aeson.toJSON . URI.render $ uri)
+                    , ("href", Aeson.toJSON href)
+                    , ("local", Aeson.toJSON isLocal)
+                    ]
+                when isLocal do
                     let href' = fromMaybe href $ Text.stripPrefix "/" href
                     uri' <-
                         URI.mkURI $
@@ -85,13 +94,4 @@ process uri = do
                                 <> "/"
                                 <> href'
                     Itinerary.push uri'
-                _ -> pure ()
             )
-
-isLocalPage :: Text -> Bool
-isLocalPage t =
-    not $
-        Text.null t
-            || Text.isInfixOf "//" t
-            || Text.isInfixOf ":" t
-            || Text.isPrefixOf "#" t

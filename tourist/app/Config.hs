@@ -1,6 +1,7 @@
 module Config where
 
 import Control.Exception (SomeException)
+import Control.Lens.Regex.Text (Regex)
 import Control.Monad.Catch (try)
 import Data.Bifunctor (first)
 import Data.Default (Default (def))
@@ -15,6 +16,8 @@ import Test.Dramaturge (Selector (..))
 import Test.Dramaturge qualified as Dramaturge
 import Test.Dramaturge.Firefox qualified as Firefox
 import Test.Dramaturge.Log (LogLevel (..))
+import Text.Regex.PCRE.Heavy (re)
+import Text.Regex.PCRE.Light.Char8 qualified as PCRE
 import Text.URI (URI, mkURI)
 import Prelude
 
@@ -22,6 +25,7 @@ data Config = Config
     { dramaturge :: Dramaturge.Config
     , output :: FilePath
     , waitFor :: Selector
+    , filter :: Regex
     , uris :: [URI]
     }
     deriving stock (Generic)
@@ -32,6 +36,7 @@ instance Default Config where
             { dramaturge = def
             , output = "."
             , waitFor = ByCSS "body > *"
+            , filter = [re|^(?!\/\/)[^:\s]+$|]
             , uris = []
             }
 
@@ -49,7 +54,9 @@ parseFirefox = do
                 ( strOption $
                     long "firefox"
                         <> metavar "FILE"
-                        <> help ("Path to the Firefox binary (default: " <> defaultFirefox.program <> ")")
+                        <> help "Path to the Firefox binary"
+                        <> value defaultFirefox.program
+                        <> showDefault
                 )
     pure def{Firefox.headless, Firefox.program}
   where
@@ -72,12 +79,16 @@ parseDramaturge = do
         flag' LogTrace $
             long "debug" <> help "Increase the logging verbosity level and add stacktraces"
 
-uriParser :: Parser URI
-uriParser = argument uriReader $ metavar "URI" <> help "The sites to visit"
-  where
-    uriReader =
-        eitherReader $
-            first (show @SomeException) . unsafePerformIO . try . mkURI . Text.pack
+uriReader :: ReadM URI
+uriReader =
+    eitherReader $
+        first (show @SomeException) . unsafePerformIO . try . mkURI . Text.pack
+
+regexReader :: ReadM Regex
+regexReader = eitherReader $ flip PCRE.compileM [PCRE.utf8]
+
+selectorReader :: ReadM Selector
+selectorReader = ByCSS <$> str
 
 parseConfig :: Parser Config
 parseConfig = do
@@ -88,22 +99,31 @@ parseConfig = do
                 ( strOption $
                     long "output"
                         <> metavar "DIR"
-                        <> help
-                            ("Where to write downloaded files (default: " <> defaultConfig.output <> ")")
+                        <> help "Where to write downloaded files"
+                        <> value defaultConfig.output
+                        <> showDefault
                 )
     waitFor <-
         fromMaybe defaultConfig.waitFor
             <$> optional
-                ( fmap ByCSS . strOption $
+                ( option selectorReader $
                     long "wait-for"
                         <> metavar "SELECTOR"
-                        <> help
-                            ( "The selector for the element to wait for (default: "
-                                <> (read . unwords . drop 1 . words . show $ defaultConfig.waitFor)
-                                <> ")"
-                            )
+                        <> help "The selector for the element to wait for"
+                        <> value defaultConfig.waitFor
+                        <> showDefaultWith (unwords . drop 1 . words . show)
                 )
-    uris <- many uriParser
+    filter <-
+        fromMaybe defaultConfig.filter
+            <$> optional
+                ( option regexReader $
+                    long "filter"
+                        <> metavar "REGEX"
+                        <> help "Only follow links matching this pattern"
+                        <> value defaultConfig.filter
+                        <> showDefaultWith (unwords . drop 2 . words . show)
+                )
+    uris <- many . argument uriReader $ metavar "URI" <> help "The sites to visit"
     simpleVersioner $ " tourist " <> showVersion Paths_tourist.version
     pure Config{..}
   where
