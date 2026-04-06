@@ -1,36 +1,35 @@
 module Main where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM (newTVarIO)
-import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Reader (ReaderT (runReaderT), runReader)
--- import Test.Marionette (Element, Selector (..), navigate, newSession, runMarionette)
--- import Test.Marionette qualified as Marionette
-
+import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.Default (def)
-import Data.List.NonEmpty (NonEmpty)
 import Effectful
+import Effectful.Exception (bracket)
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
-import Servant (NamedRoutes, Proxy (Proxy), hoistServer, serve)
+import Servant (NamedRoutes, Proxy (Proxy), hoistServer)
 import Servant.Server.Generic (genericServe)
 import Server (Routes, State, server)
-import System.IO (hPrint, stderr)
-import Test.Dramaturge hiding (runProcess)
+import Test.Dramaturge
 import Prelude
 
--- main = do
---     state :: State <- newTVarIO mempty
---     run 8080
---         . logStdoutDev
---         . genericServe
---         . hoistServer (Proxy @(NamedRoutes Routes)) (`runReaderT` state)
---         $ server
+startServer :: IO ()
+startServer = do
+    state :: State <- newTVarIO mempty
+    run 8080
+        . logStdoutDev
+        . genericServe
+        . hoistServer (Proxy @(NamedRoutes Routes)) (`runReaderT` state)
+        $ server
+
+withServer :: (IOE :> es) => Eff es a -> Eff es a
+withServer = bracket (liftIO $ forkIO startServer) (liftIO . killThread) . const
 
 main :: IO ()
-main = runEff . runDramaturge def $ do
+main = runEff . withServer . runDramaturge def $ do
     newSession
-    navigate "https://example.com"
+    navigate "http://localhost:8080"
 
 -- scrollIntoView =<< findOne (ByXPath "//h1[contains(text(), 'Example Domain')]")
 -- e <- findOne (ByXPath "//h1[contains(text(), 'Example Domain')]")

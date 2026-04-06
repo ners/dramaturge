@@ -10,10 +10,9 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader)
 import Control.Monad.Reader qualified as Reader
-import Data.Aeson (Value (Null))
+import Data.Aeson (Value)
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Encode.Pretty qualified as Aeson
-import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (LazyByteString)
 import Data.ByteString.Lazy qualified as LazyByteString
 import Data.IntMap qualified as IntMap
@@ -21,27 +20,17 @@ import Data.IntMap.Strict (IntMap)
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
-import Data.Text.Lazy qualified as LazyText
 import GHC.Generics (Generic)
 import Network.HTTP.Media ((//), (/:))
 import Servant
 import Servant.Server.Generic
 import Text.Blaze.Html
     ( ToMarkup (toMarkup)
-    , preEscapedLazyText
-    , preEscapedString
-    , preEscapedText
     , text
     )
 import Text.Blaze.Html.Renderer.Pretty (renderHtml)
-import Text.Hamlet (Html, hamlet, shamlet)
-import Text.Julius
-    ( RawJS (rawJS)
-    , julius
-    , renderJavascript
-    , renderJavascriptUrl
-    )
-import UnliftIO.STM (TVar, atomically, readTVar, readTVarIO, stateTVar)
+import Text.Hamlet (Html, shamlet)
+import UnliftIO.STM (TVar, atomically, readTVarIO, stateTVar)
 import Prelude
 
 data Routes mode = Routes

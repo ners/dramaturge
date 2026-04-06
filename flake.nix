@@ -32,10 +32,16 @@
         (hfinal: hprev: lib.mapAttrs (pname: dir: hfinal.callCabal2nix pname (sourceFilter dir) { }) projects)
         (hfinal: hprev: {
           typed-process-effectful = dontCheck (doJailbreak (unmarkBroken hprev.typed-process-effectful));
-          # We skip the check because Firefox fails to launch with
-          # Fontconfig error: No writable cache directories
-          # Should this test tool depend be a runtime depend, so that users of the library get it as well?
-          dramaturge = dontCheck (addTestToolDepend pkgs.firefox hprev.dramaturge);
+          dramaturge = lib.pipe hprev.dramaturge [
+            (drv: drv.overrideAttrs (attrs: {
+              # Firefox needs a writable home for fontconfig
+              preCheck = ''
+                ${attrs.preCheck or ""}
+                export HOME=$TMPDIR
+              '';
+            }))
+            (addTestToolDepend pkgs.firefox)
+          ];
           tourist = hprev.tourist.overrideAttrs (attrs: {
             nativeBuildInputs = [ pkgs.makeWrapper ] ++ attrs.nativeBuildInputs or [ ];
             postInstall = ''
