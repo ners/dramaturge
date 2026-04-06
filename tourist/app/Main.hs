@@ -10,6 +10,8 @@ import Data.Text qualified as Text
 import Data.Text.Encoding qualified as Text
 import Effectful
 import Effectful.FileSystem (createDirectoryIfMissing, setCurrentDirectory)
+import Effectful.Reader.Static (Reader, runReader)
+import Effectful.Reader.Static qualified as Reader
 import Effectful.State.Static.Local (State, evalState)
 import Itinerary (Itinerary)
 import Itinerary qualified
@@ -23,19 +25,21 @@ import Prelude hiding (writeFile)
 
 main :: IO ()
 main = do
-    Config{..} <- getConfig
+    config <- getConfig
     runEff
+        . runReader config
         . evalState Itinerary.empty
-        . runDramaturge dramaturge
+        . runDramaturge config.dramaturge
         $ do
-            createDirectoryIfMissing True output
-            setCurrentDirectory output
+            createDirectoryIfMissing True config.output
+            setCurrentDirectory config.output
             newSession
-            mapM_ Itinerary.push uris
+            mapM_ Itinerary.push config.uris
             whileM step
 
 type Tourist es =
-    ( State Itinerary :> es
+    ( Reader Config :> es
+    , State Itinerary :> es
     , Marionette :> es
     , Concurrent :> es
     , Timeout :> es
@@ -59,13 +63,14 @@ step =
 
 process :: (Tourist es) => URI -> Eff es ()
 process uri = do
+    config <- Reader.ask @Config
     logInfo_ $ "Visiting " <> URI.render uri
     uri `shouldSatisfy` URI.isPathAbsolute
     let filename =
             Text.unpack . URI.render $
                 URI.emptyURI & uriPath .~ (uri ^. uriPath) <> pure [URI.pathPiece|index.html|]
     navigate $ URI.render uri
-    waitForElement $ ByCSS "body > *"
+    waitForElement config.waitFor
     logInfo_ $ "Writing " <> Text.pack filename
     createDirectoryIfMissing True . takeDirectory $ filename
     writeFile filename . Text.encodeUtf8 =<< getPageSource

@@ -53,12 +53,13 @@ The test process goes as follows:
 tourist [OPTIONS] [URL]...
 ```
 
-| Option                          | Description                                     |
-| ------------------------------- | ----------------------------------------------- |
-| `--headless`/`--graphical`      | Run with or without a GUI (default: headless)   |
-| `--quiet`/`--verbose`/`--debug` | Control log output (default: verbose)           |
-| `--output <DIR>`                | Where to write the static files (default: `.`)  |
-| `--firefox <FILE>`              | Path to the Firefox binary (default: `firefox`) |
+| Option                          | Description                              | Default    |
+| ------------------------------- | ---------------------------------------- | ---------- |
+| `--headless`/`--graphical`      | Run with or without a GUI                | headless   |
+| `--quiet`/`--verbose`/`--debug` | Control log output                       | verbose    |
+| `--waitFor <SELECTOR>`          | The selector for the element to wait for | `body > *` |
+| `--output <DIR>`                | Where to write the static files          | `.`        |
+| `--firefox <FILE>`              | Path to the Firefox binary               | `firefox`  |
 
 **tourist** likes to travel light; it does not download any browsers or driver binaries to your computer.
 All it needs is Firefox to hitch a ride in.
