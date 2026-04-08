@@ -14,6 +14,7 @@ module Test.Dramaturge
     , module Effectful.FileSystem.IO.ByteString
     , module Effectful.Hspec
     , module Effectful.Marionette
+    , module Effectful.Retry
     , module Effectful.Timeout
     , module GHC.Stack
     )
@@ -34,6 +35,7 @@ import Effectful.FileSystem (FileSystem, runFileSystem)
 import Effectful.FileSystem.IO.ByteString (writeFile)
 import Effectful.Hspec
 import Effectful.Marionette
+import Effectful.Retry
 import Effectful.Timeout (Timeout, runTimeout, timeout)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Test.Dramaturge.Config
@@ -50,6 +52,7 @@ runDramaturge
             ': Environment
             ': FileSystem
             ': Hspec
+            ': Retry
             ': Timeout
             ': TypedProcess
             ': Log
@@ -63,6 +66,7 @@ runDramaturge Config{..} =
         . runEnvironment
         . runFileSystem
         . runHspec
+        . runRetry
         . runTimeout
         . runTypedProcess
         . runLog logLevel

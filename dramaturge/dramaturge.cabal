@@ -71,6 +71,7 @@ library
     log-base,
     log-effectful,
     marionette-effectful,
+    retry-effectful,
     these,
     time,
     typed-process-effectful,
