@@ -163,9 +163,9 @@ deleteSession = m Marionette.deleteSession
 -- dismissAlert :: (HasCallStack, Marionette :> es) => Eff es ()
 -- dismissAlert = sendCommand_ Command{command = "WebDriver:DismissAlert", parameters = Aeson.object []}
 --
--- elementClear :: (HasCallStack, Marionette :> es) => Eff es ()
--- elementClear = sendCommand_ Command{command = "WebDriver:ElementClear", parameters = Aeson.object []}
---
+elementClear :: (HasCallStack, Marionette :> es) => Element -> Eff es ()
+elementClear = m . Marionette.elementClear
+
 elementClick :: (HasCallStack, Marionette :> es) => Element -> Eff es ()
 elementClick = m . Marionette.elementClick
 

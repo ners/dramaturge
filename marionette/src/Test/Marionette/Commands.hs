@@ -158,10 +158,13 @@ dismissAlert =
     sendCommand_
         Command{command = "WebDriver:DismissAlert", parameters = Aeson.object []}
 
-elementClear :: (HasCallStack, Marionette m) => m ()
-elementClear =
+elementClear :: (HasCallStack, Marionette m) => Element -> m ()
+elementClear Element{..} =
     sendCommand_
-        Command{command = "WebDriver:ElementClear", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:ElementClear"
+            , parameters = Aeson.object ["id" .= elementId]
+            }
 
 elementClick :: (HasCallStack, Marionette m) => Element -> m ()
 elementClick Element{..} =
