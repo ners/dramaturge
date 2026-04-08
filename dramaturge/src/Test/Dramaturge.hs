@@ -10,6 +10,7 @@ module Test.Dramaturge
     , module Effectful.Concurrent.Async
     , module Effectful.Environment
     , module Effectful.Exception
+    , module Effectful.Fail
     , module Effectful.FileSystem
     , module Effectful.FileSystem.IO.ByteString
     , module Effectful.Hspec
@@ -32,6 +33,7 @@ import Effectful.Concurrent (Concurrent, runConcurrent, threadDelay)
 import Effectful.Concurrent.Async (concurrently)
 import Effectful.Environment hiding (setEnv)
 import Effectful.Exception (Exception (..), SomeException, catch, try)
+import Effectful.Fail (Fail, runFailIO)
 import Effectful.FileSystem (FileSystem, runFileSystem)
 import Effectful.FileSystem.IO.ByteString (writeFile)
 import Effectful.Hspec
@@ -51,6 +53,7 @@ runDramaturge
     -> Eff
         ( Concurrent
             ': Environment
+            ': Fail
             ': FileSystem
             ': Hspec
             ': Retry
@@ -66,6 +69,7 @@ runDramaturge Config{..} =
     runConcurrent
         . runEnvironment
         . runFileSystem
+        . runFailIO
         . runHspec
         . runRetry
         . runTimeout
