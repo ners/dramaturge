@@ -16,6 +16,7 @@ module Test.Dramaturge
     , module Effectful.Marionette
     , module Effectful.Retry
     , module Effectful.Timeout
+    , module Data.These
     , module GHC.Stack
     )
 where
@@ -25,7 +26,7 @@ import Control.Monad.Catch (MonadThrow (throwM))
 import Control.Monad.Extra (untilJustM)
 import Data.Aeson (ToJSON (toJSON))
 import Data.String (fromString)
-import Data.These (These (..))
+import Data.These
 import Effectful
 import Effectful.Concurrent (Concurrent, runConcurrent, threadDelay)
 import Effectful.Concurrent.Async (concurrently)
@@ -146,7 +147,7 @@ tryThese a b =
         (Right a, Right b) -> pure (These a b)
         (Left a, Left b) -> throwM [a, b]
 
-findTheseElems
+findTheseElements
     :: ( HasCallStack
        , Concurrent :> es
        , Log :> es
@@ -155,7 +156,7 @@ findTheseElems
     => Selector
     -> Selector
     -> Eff es (These Element Element)
-findTheseElems s1 s2 = do
+findTheseElements s1 s2 = do
     logTraceShow_ (s1, s2)
     withFrozenCallStack $ tryThese (findElement s1) (findElement s2)
 
