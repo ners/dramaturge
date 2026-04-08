@@ -50,18 +50,16 @@ common common
     TypeFamilies
     ViewPatterns
 
-  build-depends:
-    aeson,
-    base >=4.16 && <5,
-    bytestring,
-
 library
   import: common
   hs-source-dirs: src
   build-depends:
+    aeson,
+    base >=4.16 && <5,
     base64-bytestring,
     binary,
     binary-parsers,
+    bytestring,
     containers,
     exceptions,
     hashable,
@@ -90,3 +88,24 @@ library
     Test.Marionette.Timeouts
     Test.Marionette.WebAuthn
     Test.Marionette.Window
+
+test-suite test
+  import: common
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  build-depends:
+    aeson,
+    base,
+    bytestring,
+    exceptions,
+    hspec,
+    http-types,
+    lucid2,
+    marionette,
+    mtl,
+    text,
+    typed-process,
+    unliftio,
+    wai,
+    warp,

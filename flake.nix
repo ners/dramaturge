@@ -30,26 +30,31 @@
       libPnames = filter (pname: !lib.elem pname [ "tourist" ]) pnames;
       haskell-overlay = pkgs: with pkgs.haskell.lib.compose; lib.composeManyExtensions [
         (hfinal: hprev: lib.mapAttrs (pname: dir: hfinal.callCabal2nix pname (sourceFilter dir) { }) projects)
-        (hfinal: hprev: {
-          typed-process-effectful = dontCheck (doJailbreak (unmarkBroken hprev.typed-process-effectful));
-          dramaturge = lib.pipe hprev.dramaturge [
-            (drv: drv.overrideAttrs (attrs: {
-              # Firefox needs a writable home for fontconfig
-              preCheck = ''
-                ${attrs.preCheck or ""}
-                export HOME=$TMPDIR
+        (hfinal: hprev:
+          let
+            foxify = drv: lib.pipe drv [
+              (drv: drv.overrideAttrs (attrs: {
+                # Firefox needs a writable home for fontconfig
+                preCheck = ''
+                  ${attrs.preCheck or ""}
+                  export HOME=$TMPDIR
+                '';
+              }))
+              (addTestToolDepend pkgs.firefox)
+            ];
+          in
+          {
+            typed-process-effectful = dontCheck (doJailbreak (unmarkBroken hprev.typed-process-effectful));
+            marionette = foxify hprev.marionette;
+            dramaturge = foxify hprev.dramaturge;
+            tourist = hprev.tourist.overrideAttrs (attrs: {
+              nativeBuildInputs = [ pkgs.makeWrapper ] ++ attrs.nativeBuildInputs or [ ];
+              postInstall = ''
+                ${attrs.postInstall or ""}
+                wrapProgram "$out"/bin/tourist --prefix PATH : "${lib.makeBinPath [pkgs.firefox]}"
               '';
-            }))
-            (addTestToolDepend pkgs.firefox)
-          ];
-          tourist = hprev.tourist.overrideAttrs (attrs: {
-            nativeBuildInputs = [ pkgs.makeWrapper ] ++ attrs.nativeBuildInputs or [ ];
-            postInstall = ''
-              ${attrs.postInstall or ""}
-              wrapProgram "$out"/bin/tourist --prefix PATH : "${lib.makeBinPath [pkgs.firefox]}"
-            '';
-          });
-        })
+            });
+          })
         (hfinal: hprev: lib.optionalAttrs (lib.versionAtLeast hprev.ghc.version "9.12") {
           HList = doJailbreak hprev.HList;
         })
