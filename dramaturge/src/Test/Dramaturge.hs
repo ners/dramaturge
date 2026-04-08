@@ -22,11 +22,12 @@ module Test.Dramaturge
     )
 where
 
-import Control.Monad ((<=<))
+import Control.Monad (unless, (<=<))
 import Control.Monad.Catch (MonadThrow (throwM))
 import Control.Monad.Extra (untilJustM)
 import Data.Aeson (ToJSON (toJSON))
 import Data.String (fromString)
+import Data.Text (Text)
 import Data.These
 import Effectful
 import Effectful.Concurrent (Concurrent, runConcurrent, threadDelay)
@@ -56,11 +57,11 @@ runDramaturge
             ': Fail
             ': FileSystem
             ': Hspec
+            ': Log
+            ': Marionette
             ': Retry
             ': Timeout
             ': TypedProcess
-            ': Log
-            ': Marionette
             ': es
         )
         a
@@ -68,14 +69,14 @@ runDramaturge
 runDramaturge Config{..} =
     runConcurrent
         . runEnvironment
-        . runFileSystem
         . runFailIO
+        . runFileSystem
         . runHspec
+        . runLog logLevel
+        . runMarionette
         . runRetry
         . runTimeout
         . runTypedProcess
-        . runLog logLevel
-        . runMarionette
         . withFirefox firefox
         . inject
 
@@ -92,15 +93,15 @@ waitFor
     :: forall a es
      . ( HasCallStack
        , Concurrent :> es
-       , Timeout :> es
        , Log :> es
+       , Timeout :> es
        )
     => String
     -> Eff es a
     -> Eff es a
 waitFor what action =
-    withTimeout what maxDuration . untilJustM $ do
-        (Just <$> action) `catch` \(e :: SomeException) -> do
+    withTimeout what maxDuration . untilJustM $
+        (Just <$> action) `catch` \e -> do
             logTrace_ . fromString . displayException @SomeException $ e
             threadDelay stepDuration
             pure Nothing
@@ -112,30 +113,33 @@ waitFor what action =
 waitForElementThat
     :: ( HasCallStack
        , Concurrent :> es
-       , Timeout :> es
        , Log :> es
        , Marionette :> es
+       , Timeout :> es
        )
-    => (Element -> Eff es ())
+    => String
+    -> (Element -> Eff es ())
     -> Selector
     -> Eff es Element
-waitForElementThat test selector = withFrozenCallStack $ waitFor what do
+waitForElementThat what test selector = withFrozenCallStack $ waitFor what do
     e <- findElement selector
     test e
     pure e
-  where
-    what = "element (" <> show selector <> ")"
 
 waitForElement
     :: ( HasCallStack
        , Concurrent :> es
-       , Timeout :> es
        , Log :> es
        , Marionette :> es
+       , Timeout :> es
        )
     => Selector
     -> Eff es Element
-waitForElement = waitForElementThat (const $ pure ())
+waitForElement selector = waitForElementThat what test selector
+  where
+    what = "element (" <> show selector <> ")"
+    test :: forall a m. (Applicative m) => a -> m ()
+    test = const $ pure ()
 
 instance (Exception e) => Exception [e]
 
@@ -168,14 +172,81 @@ scrollIntoView
     :: (HasCallStack, Marionette :> es, Log :> es)
     => Element
     -> Eff es ()
-scrollIntoView e = do
-    logTraceShow_ e
+scrollIntoView element = do
+    logTraceShow_ element
     executeScript
         "arguments[0].scrollIntoView({behavior: 'instant', block: 'nearest'})"
-        [toJSON e]
+        [toJSON element]
 
 click :: (HasCallStack, Marionette :> es, Log :> es) => Element -> Eff es ()
-click e = do
-    scrollIntoView e
-    logTraceShow_ e
-    elementClick e
+click element = do
+    scrollIntoView element
+    logTraceShow_ element
+    elementClick element
+
+getValue
+    :: (HasCallStack, Marionette :> es, Log :> es)
+    => Element
+    -> Eff es Text
+getValue element = do
+    value <- executeScript "return arguments[0].value" [toJSON element]
+    logTraceShow_ value
+    pure value
+
+setValue
+    :: ( HasCallStack
+       , Concurrent :> es
+       , Hspec :> es
+       , Log :> es
+       , Marionette :> es
+       , Timeout :> es
+       )
+    => Text
+    -> Element
+    -> Eff es ()
+setValue value element =
+    getValue element >>= flip (unless . (== value)) do
+        logTraceShow_ (element, value)
+        elementClear element
+        waitFor "element to be clear" $ element `shouldHaveValue` ""
+        elementSendKeys element value
+        waitFor "element to have new value" $ element `shouldHaveValue` value
+
+shouldHaveValue
+    :: (HasCallStack, Marionette :> es, Hspec :> es, Log :> es)
+    => Element
+    -> Text
+    -> Eff es ()
+shouldHaveValue element value = getValue element `shouldReturn` value
+
+getChecked
+    :: (HasCallStack, Marionette :> es, Log :> es)
+    => Element
+    -> Eff es Bool
+getChecked element = do
+    checked <- executeScript "return arguments[0].checked" [toJSON element]
+    logTraceShow_ checked
+    pure checked
+
+setChecked
+    :: ( HasCallStack
+       , Concurrent :> es
+       , Hspec :> es
+       , Log :> es
+       , Marionette :> es
+       , Timeout :> es
+       )
+    => Bool
+    -> Element
+    -> Eff es ()
+setChecked checked element =
+    getChecked element >>= flip (unless . (== checked)) do
+        logTraceShow_ (element, checked)
+        waitFor "element to have new checked" $ element `shouldHaveChecked` checked
+
+shouldHaveChecked
+    :: (HasCallStack, Marionette :> es, Hspec :> es, Log :> es)
+    => Element
+    -> Bool
+    -> Eff es ()
+shouldHaveChecked element checked = getChecked element `shouldReturn` checked

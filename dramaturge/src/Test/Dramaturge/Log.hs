@@ -120,21 +120,19 @@ logMessage
     -> Value
     -> Eff es ()
 logMessage logLevel t v =
-    Effectful.Log.logMessage logLevel t $
-        toJSON
-            LogData
-                { callStack = Just GHC.Stack.callStack
-                , value = Just v
-                }
+    Effectful.Log.logMessage logLevel t . toJSON $
+        LogData
+            { callStack = Just GHC.Stack.callStack
+            , value = Just v
+            }
 
 logMessage_ :: (HasCallStack, Log :> es) => LogLevel -> Text -> Eff es ()
 logMessage_ logLevel t =
-    Effectful.Log.logMessage logLevel t $
-        toJSON
-            LogData
-                { callStack = Just GHC.Stack.callStack
-                , value = Nothing
-                }
+    Effectful.Log.logMessage logLevel t . toJSON $
+        LogData
+            { callStack = Just GHC.Stack.callStack
+            , value = Nothing
+            }
 
 logTrace :: (HasCallStack, ToJSON a, Log :> es) => Text -> a -> Eff es ()
 logTrace t = withFrozenCallStack $ logMessage LogTrace t . toJSON
