@@ -2,29 +2,25 @@ module Test.Dramaturge.Firefox where
 
 import Control.Monad (when)
 import Control.Monad.Extra (unlessM)
-import Data.Aeson qualified as Aeson
-import Data.Coerce (coerce)
 import Data.Default (Default (..))
-import Data.Int (Int32)
 import Data.Maybe (isJust)
+import Data.String (fromString)
 import Effectful
 import Effectful.Dispatch.Static (unsafeEff_)
 import Effectful.Exception (bracketOnError)
 import Effectful.Marionette (Marionette)
 import Effectful.Marionette qualified as Marionette
 import Effectful.Process.Typed
-    ( ExitCode (..)
-    , Process
+    ( Process
     , TypedProcess
+    , checkExitCode
     , getExitCode
     , getPid
     , proc
     , startProcess
-    , waitExitCode
     )
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
-import System.Posix.Types (CPid (CPid))
 import Test.Dramaturge.Log
 import Prelude
 
@@ -79,7 +75,7 @@ withFirefox Config{..} action =
         ( do
             process <- startFirefox program headless
             pid <- unsafeEff_ (getPid process)
-            logInfo "Starting Firefox process" . Aeson.object $ [("pid", cpidJson pid)]
+            logInfo_ . fromString $ "Started Firefox process (" <> show pid <> ")"
             pure process
         )
         (when closeOnError . ensureStopped)
@@ -100,15 +96,5 @@ withFirefox Config{..} action =
         unlessM (isJust <$> getExitCode process) do
             pid <- unsafeEff_ (getPid process)
             Marionette.quit
-            exitCode <- waitExitCode process
-            logInfo "Stopped Firefox process" . Aeson.object $
-                [ ("pid", cpidJson pid)
-                , ("exitCode", exitCodeJson exitCode)
-                ]
-
-    exitCodeJson :: ExitCode -> Aeson.Value
-    exitCodeJson ExitSuccess = Aeson.toJSON @Int 0
-    exitCodeJson (ExitFailure i) = Aeson.toJSON i
-
-    cpidJson :: Maybe CPid -> Aeson.Value
-    cpidJson = maybe Aeson.Null (Aeson.toJSON . coerce @_ @Int32)
+            checkExitCode process
+            logInfo_ . fromString $ "Stopped Firefox process (" <> show pid <> ")"
