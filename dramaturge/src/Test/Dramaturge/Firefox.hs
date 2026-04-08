@@ -16,7 +16,10 @@ import Effectful.Process.Typed
     , checkExitCode
     , getExitCode
     , getPid
+    , nullStream
     , proc
+    , setStderr
+    , setStdout
     , startProcess
     )
 import GHC.Generics (Generic)
@@ -52,10 +55,14 @@ startFirefox
     -> Bool
     -> Eff es (Process () () ())
 startFirefox program headless =
-    startProcess . proc program . mconcat $
-        [ ["--marionette"]
-        , ["--headless" | headless]
-        ]
+    startProcess
+        . setStdout nullStream
+        . setStderr nullStream
+        . proc program
+        . mconcat
+        $ [ ["--marionette"]
+          , ["--headless" | headless]
+          ]
 
 -- | Run an action with a managed Firefox process.
 --

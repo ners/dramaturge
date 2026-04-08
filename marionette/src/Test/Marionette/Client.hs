@@ -5,7 +5,7 @@
 module Test.Marionette.Client where
 
 import Control.Exception (AssertionFailed (AssertionFailed))
-import Control.Monad (forever, void, when, (<=<))
+import Control.Monad (forever, void, (<=<))
 import Control.Monad.Catch
     ( Exception (..)
     , MonadCatch
@@ -29,7 +29,6 @@ import Data.ByteString.Builder.Extra qualified as ByteString
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (..))
 import Data.IntMap.Strict qualified as IntMap
-import Data.Maybe (isJust)
 import GHC.Stack (HasCallStack)
 import Network.Simple.TCP
     ( HostName
@@ -55,7 +54,6 @@ import UnliftIO
     , readTMVar
     )
 import UnliftIO.Concurrent (forkIO, killThread, threadDelay)
-import UnliftIO.Environment (lookupEnv)
 import UnliftIO.Retry (constantDelay, limitRetriesByCumulativeDelay, recoverAll)
 import UnliftIO.STM
     ( atomically
@@ -197,7 +195,6 @@ runMarionette action = do
     pendingCommands <- newTVarIO mempty
     let handleIncoming :: MarionetteMessage -> MarionetteT m ()
         handleIncoming message = do
-            marionetteTrace $ "< " <> show message
             decodeMarionetteM message >>= \Message{..} ->
                 atomically
                     ( stateTVar pendingCommands $
@@ -211,7 +208,6 @@ runMarionette action = do
     let handleCommand :: Socket -> Int -> CommandWithCallback -> MarionetteT m ()
         handleCommand socket messageId (CommandWithCallback messageContent callback) = do
             let message = MarionetteMessage . Aeson.encode $ Message{..}
-            marionetteTrace $ "> " <> show message
             liftIO . sendLazy socket . Binary.encode $ message
             timeout <- forkIO do
                 threadDelay 5_000_000
@@ -228,6 +224,3 @@ runMarionette action = do
                 race_ send receive
     flip runReaderT sendQueue . runMarionetteT $
         either (const $ throwM SocketClosed) pure =<< race runSocket action
-
-marionetteTrace :: (MonadIO m) => String -> m ()
-marionetteTrace = (lookupEnv "MARIONETTE_DEBUG" >>=) . flip (when . isJust) . liftIO . putStrLn

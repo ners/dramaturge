@@ -15,7 +15,14 @@ import Lucid
 import Network.HTTP.Types (status200)
 import Network.Wai (Application, rawPathInfo, responseLBS)
 import Network.Wai.Handler.Warp (run)
-import System.Process.Typed (checkExitCode, proc, startProcess)
+import System.Process.Typed
+    ( checkExitCode
+    , nullStream
+    , proc
+    , setStderr
+    , setStdout
+    , startProcess
+    )
 import Test.Hspec hiding (after, before)
 import Test.Marionette
 import Test.Marionette qualified as Marionette
@@ -77,6 +84,8 @@ withFirefox :: IO a -> IO a
 withFirefox =
     bracket
         ( startProcess
+            . setStdout nullStream
+            . setStderr nullStream
             . proc "firefox"
             $ [ "--marionette"
               , "--headless"
