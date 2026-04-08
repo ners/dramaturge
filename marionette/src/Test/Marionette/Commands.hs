@@ -3,18 +3,14 @@
 
 module Test.Marionette.Commands where
 
-import Control.Exception (AssertionFailed (AssertionFailed))
-import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.Error.Class (MonadError (throwError))
 import Data.Aeson
-    ( FromJSON (parseJSON)
+    ( FromJSON
     , KeyValue (..)
     , ToJSON (toJSON)
     , Value (..)
-    , (.:)
     )
 import Data.Aeson qualified as Aeson
-import Data.Aeson.Types qualified as Aeson
+import Data.Aeson.KeyMap qualified as Object
 import Data.ByteString (ByteString)
 import Data.ByteString.Base64 qualified as Base64
 import Data.Foldable qualified as Foldable
@@ -23,9 +19,34 @@ import Data.Text.Encoding qualified as Text
 import GHC.Generics (Generic)
 import GHC.IsList (IsList (Item, fromList))
 import GHC.Stack (HasCallStack)
+import Test.Marionette.AccessibilityProperties (AccessibilityProperties)
 import Test.Marionette.Class
 import Test.Marionette.Client
+import Test.Marionette.Context (Context)
+import Test.Marionette.Cookie (Cookie)
+import Test.Marionette.Element (Element (..), Shadow)
+import Test.Marionette.Frame (Frame)
+import Test.Marionette.Orientation (Orientation)
 import Test.Marionette.Protocol
+import Test.Marionette.Rect (Rect)
+import Test.Marionette.Registry (RegistryEntry)
+import Test.Marionette.Selector
+    ( Selector
+    , SelectorFrom (..)
+    , SelectorFromShadowRoot (..)
+    )
+import Test.Marionette.Timeouts (Timeouts)
+import Test.Marionette.WebAuthn
+    ( AuthenticatorId (..)
+    , Credential
+    , CredentialId (..)
+    , VirtualAuthenticator
+    )
+import Test.Marionette.Window
+    ( NewWindowResult
+    , WindowHandle (..)
+    , WindowType (..)
+    )
 import Prelude hiding (log)
 
 newtype ValueObject a = ValueObject {value :: a}
@@ -34,129 +55,124 @@ newtype ValueObject a = ValueObject {value :: a}
 
 type role ValueObject representational
 
--- | Specifies element(s) within a DOM tree using various selection methods.
-data Selector
-    = ById Text
-    | ByName Text
-    | -- | (Note: multiple classes are not allowed. For more control, use 'ByCSS')
-      ByClass Text
-    | ByTag Text
-    | ByLinkText Text
-    | ByPartialLinkText Text
-    | ByCSS Text
-    | ByXPath Text
-    deriving stock (Eq, Show, Ord)
+acceptConnections :: (HasCallStack, Marionette m) => Bool -> m ()
+acceptConnections value =
+    sendCommand_
+        Command
+            { command = "Marionette:AcceptConnections"
+            , parameters = Aeson.object ["value" .= value]
+            }
 
-selectorObject :: Selector -> Aeson.Object
-selectorObject s =
-    case s of
-        ById t -> selector "id" t
-        ByName t -> selector "name" t
-        ByClass t -> selector "class name" t
-        ByTag t -> selector "tag name" t
-        ByLinkText t -> selector "link text" t
-        ByPartialLinkText t -> selector "partial link text" t
-        ByCSS t -> selector "css selector" t
-        ByXPath t -> selector "xpath" t
-  where
-    selector :: Text -> Text -> Aeson.Object
-    selector sn t = fromList ["using" .= sn, "value" .= t]
+getAccessibilityPropertiesForAccessibilityNode
+    :: (HasCallStack, Marionette m)
+    => Text
+    -> m AccessibilityProperties
+getAccessibilityPropertiesForAccessibilityNode nodeId =
+    sendCommand
+        Command
+            { command = "Marionette:GetAccessibilityPropertiesForAccessibilityNode"
+            , parameters = Aeson.object ["nodeId" .= nodeId]
+            }
 
-instance ToJSON Selector where
-    toJSON = Aeson.Object . selectorObject
+getAccessibilityPropertiesForElement
+    :: (HasCallStack, Marionette m)
+    => Element
+    -> m AccessibilityProperties
+getAccessibilityPropertiesForElement Element{..} =
+    sendCommand
+        Command
+            { command = "Marionette:GetAccessibilityPropertiesForElement"
+            , parameters = Aeson.object ["id" .= elementId]
+            }
 
--- | An opaque identifier for a web page element.
-newtype Element = Element {elementId :: Text}
-    deriving stock (Eq, Ord, Show, Read)
+getContext :: (HasCallStack, Marionette m) => m Context
+getContext = value <$> sendCommand "Marionette:GetContext"
 
-instance FromJSON Element where
-    parseJSON = Aeson.withObject "Element" \o ->
-        Element <$> (o .: "element-6066-11e4-a52e-4f735466cecf")
+getScreenOrientation :: (HasCallStack, Marionette m) => m Orientation
+getScreenOrientation = value <$> sendCommand "Marionette:GetScreenOrientation"
 
-instance ToJSON Element where
-    toJSON (Element e) = Aeson.object ["element-6066-11e4-a52e-4f735466cecf" .= e]
-
---   "Marionette:AcceptConnections": GeckoDriver.prototype.acceptConnections,
---   "Marionette:GetContext": GeckoDriver.prototype.getContext,
---   "Marionette:GetScreenOrientation": GeckoDriver.prototype.getScreenOrientation,
---   "Marionette:GetWindowType": GeckoDriver.prototype.getWindowType,
-
-data SelectorFrom = SelectorFrom Element Selector
-
-instance ToJSON SelectorFrom where
-    toJSON (SelectorFrom Element{..} s) = Aeson.Object $ fromList ["element" .= elementId] <> selectorObject s
+getWindowType :: (HasCallStack, Marionette m) => m Text
+getWindowType = value <$> sendCommand "Marionette:GetWindowType"
 
 quit :: (HasCallStack, Marionette m) => m ()
-quit =
-    sendCommand_ Command{command = "Marionette:Quit", parameters = Aeson.object []}
+quit = sendCommand_ "Marionette:Quit"
 
---   "Marionette:RegisterChromeHandler":
---     GeckoDriver.prototype.registerChromeHandler,
---   "Marionette:UnregisterChromeHandler":
---     GeckoDriver.prototype.unregisterChromeHandler,
---   "Marionette:SetContext": GeckoDriver.prototype.setContext,
---   "Marionette:SetScreenOrientation": GeckoDriver.prototype.setScreenOrientation,
---
---   // Addon service
---   "Addon:Install": GeckoDriver.prototype.installAddon,
---   "Addon:Uninstall": GeckoDriver.prototype.uninstallAddon,
---
---   // L10n service
---   "L10n:LocalizeProperty": GeckoDriver.prototype.localizeProperty,
---
---   // Reftest service
---   "reftest:setup": GeckoDriver.prototype.setupReftest,
---   "reftest:run": GeckoDriver.prototype.runReftest,
---   "reftest:teardown": GeckoDriver.prototype.teardownReftest,
+registerChromeHandler
+    :: (HasCallStack, Marionette m)
+    => Text
+    -> [RegistryEntry]
+    -> m Text
+registerChromeHandler manifestPath entries =
+    sendCommand
+        Command
+            { command = "Marionette:RegisterChromeHandler"
+            , parameters =
+                Aeson.object
+                    [ "manifestPath" .= manifestPath
+                    , "entries" .= entries
+                    ]
+            }
+
+setContext :: (HasCallStack, Marionette m) => Context -> m ()
+setContext value =
+    sendCommand_
+        Command
+            { command = "Marionette:SetContext"
+            , parameters = Aeson.object ["value" .= value]
+            }
+
+setScreenOrientation :: (HasCallStack, Marionette m) => Orientation -> m ()
+setScreenOrientation orientation =
+    sendCommand_
+        Command
+            { command = "Marionette:SetScreenOrientation"
+            , parameters = Aeson.object ["orientation" .= orientation]
+            }
+
+unregisterChromeHandler :: (HasCallStack, Marionette m) => Text -> m ()
+unregisterChromeHandler handlerId =
+    sendCommand_
+        Command
+            { command = "Marionette:UnregisterChromeHandler"
+            , parameters = Aeson.object ["id" .= handlerId]
+            }
 
 acceptAlert :: (HasCallStack, Marionette m) => m ()
-acceptAlert =
-    sendCommand_
-        Command{command = "WebDriver:AcceptAlert", parameters = Aeson.object []}
+acceptAlert = sendCommand_ "WebDriver:AcceptAlert"
 
-acceptDialog :: (HasCallStack, Marionette m) => m ()
-acceptDialog =
+addCookie :: (HasCallStack, Marionette m) => Cookie -> m ()
+addCookie cookie =
     sendCommand_
-        Command{command = "WebDriver:AcceptDialog", parameters = Aeson.object []}
-
-addCookie :: (HasCallStack, Marionette m) => m ()
-addCookie =
-    sendCommand_
-        Command{command = "WebDriver:AddCookie", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:AddCookie"
+            , parameters = Aeson.object ["cookie" .= cookie]
+            }
 
 back :: (HasCallStack, Marionette m) => m ()
-back =
-    sendCommand_ Command{command = "WebDriver:Back", parameters = Aeson.object []}
+back = sendCommand_ "WebDriver:Back"
 
 closeChromeWindow :: (HasCallStack, Marionette m) => m ()
-closeChromeWindow =
-    sendCommand_
-        Command{command = "WebDriver:CloseChromeWindow", parameters = Aeson.object []}
+closeChromeWindow = sendCommand_ "WebDriver:CloseChromeWindow"
 
 closeWindow :: (HasCallStack, Marionette m) => m ()
-closeWindow =
-    sendCommand_
-        Command{command = "WebDriver:CloseWindow", parameters = Aeson.object []}
+closeWindow = sendCommand_ "WebDriver:CloseWindow"
 
 deleteAllCookies :: (HasCallStack, Marionette m) => m ()
-deleteAllCookies =
-    sendCommand_
-        Command{command = "WebDriver:DeleteAllCookies", parameters = Aeson.object []}
+deleteAllCookies = sendCommand_ "WebDriver:DeleteAllCookies"
 
-deleteCookie :: (HasCallStack, Marionette m) => m ()
-deleteCookie =
+deleteCookie :: (HasCallStack, Marionette m) => Text -> m ()
+deleteCookie name =
     sendCommand_
-        Command{command = "WebDriver:DeleteCookie", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:DeleteCookie"
+            , parameters = Aeson.object ["name" .= name]
+            }
 
 deleteSession :: (HasCallStack, Marionette m) => m ()
-deleteSession =
-    sendCommand_
-        Command{command = "WebDriver:DeleteSession", parameters = Aeson.object []}
+deleteSession = sendCommand_ "WebDriver:DeleteSession"
 
 dismissAlert :: (HasCallStack, Marionette m) => m ()
-dismissAlert =
-    sendCommand_
-        Command{command = "WebDriver:DismissAlert", parameters = Aeson.object []}
+dismissAlert = sendCommand_ "WebDriver:DismissAlert"
 
 elementClear :: (HasCallStack, Marionette m) => Element -> m ()
 elementClear Element{..} =
@@ -179,17 +195,27 @@ elementSendKeys Element{..} text =
     sendCommand_
         Command
             { command = "WebDriver:ElementSendKeys"
-            , parameters = Aeson.object ["id" .= elementId, "text" .= text]
+            , parameters =
+                Aeson.object
+                    [ "id" .= elementId
+                    , "text" .= text
+                    ]
             }
 
 executeAsyncScript
     :: (HasCallStack, Marionette m, Foldable f, FromJSON a)
-    => Text -> f Value -> m (Maybe a)
+    => Text
+    -> f Value
+    -> m (Maybe a)
 executeAsyncScript script args =
     fmap value . sendCommand $
         Command
             { command = "WebDriver:ExecuteAsyncScript"
-            , parameters = Aeson.object ["script" .= script, "args" .= Foldable.toList args]
+            , parameters =
+                Aeson.object
+                    [ "script" .= script
+                    , "args" .= Foldable.toList args
+                    ]
             }
 
 executeScript
@@ -201,13 +227,21 @@ executeScript script args =
     fmap value . sendCommand $
         Command
             { command = "WebDriver:ExecuteScript"
-            , parameters = Aeson.object ["script" .= script, "args" .= Foldable.toList args]
+            , parameters =
+                Aeson.object
+                    [ "script" .= script
+                    , "args" .= Foldable.toList args
+                    ]
             }
 
 findElement :: (HasCallStack, Marionette m) => Selector -> m Element
 findElement selector =
-    fmap value . sendCommand $
-        Command{command = "WebDriver:FindElement", parameters = toJSON selector}
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:FindElement"
+                , parameters = toJSON selector
+                }
 
 findElementFrom
     :: (HasCallStack, Marionette m)
@@ -215,26 +249,43 @@ findElementFrom
     -> Selector
     -> m Element
 findElementFrom element selector =
-    fmap value . sendCommand $
-        Command
-            { command = "WebDriver:FindElement"
-            , parameters = toJSON (SelectorFrom element selector)
-            }
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:FindElement"
+                , parameters = toJSON $ SelectorFrom element selector
+                }
 
--- findElementFromShadowRoot :: (HasCallStack, Marionette m) => m ()
--- findElementFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementFromShadowRoot", parameters = Aeson.object []}
+findElementFromShadowRoot
+    :: (HasCallStack, Marionette m)
+    => Shadow
+    -> Selector
+    -> m Element
+findElementFromShadowRoot shadowRoot selector =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:FindElementFromShadowRoot"
+                , parameters = toJSON $ SelectorFromShadowRoot shadowRoot selector
+                }
 
 findElements
     :: (HasCallStack, Marionette m, IsList list, Item list ~ Element)
-    => Selector -> m list
+    => Selector
+    -> m list
 findElements selector =
     fromList
         <$> sendCommand
-            Command{command = "WebDriver:FindElements", parameters = toJSON selector}
+            Command
+                { command = "WebDriver:FindElements"
+                , parameters = toJSON selector
+                }
 
 findElementsFrom
     :: (HasCallStack, Marionette m, IsList list, Item list ~ Element)
-    => Element -> Selector -> m list
+    => Element
+    -> Selector
+    -> m list
 findElementsFrom element selector =
     fromList
         <$> sendCommand
@@ -243,54 +294,54 @@ findElementsFrom element selector =
                 , parameters = toJSON (SelectorFrom element selector)
                 }
 
--- findElementsFromShadowRoot :: (HasCallStack, Marionette m) => m ()
--- findElementsFromShadowRoot = sendCommand_ Command{command = "WebDriver:FindElementsFromShadowRoot", parameters = Aeson.object []}
+findElementsFromShadowRoot
+    :: (HasCallStack, Marionette m, IsList list, Item list ~ Element)
+    => Shadow
+    -> Selector
+    -> m list
+findElementsFromShadowRoot shadowRoot selector =
+    fromList
+        <$> sendCommand
+            Command
+                { command = "WebDriver:FindElementsFromShadowRoot"
+                , parameters = toJSON $ SelectorFromShadowRoot shadowRoot selector
+                }
 
 forward :: (HasCallStack, Marionette m) => m ()
-forward =
-    sendCommand_
-        Command{command = "WebDriver:Forward", parameters = Aeson.object []}
+forward = sendCommand_ "WebDriver:Forward"
 
 fullscreenWindow :: (HasCallStack, Marionette m) => m ()
-fullscreenWindow =
-    sendCommand_
-        Command{command = "WebDriver:FullscreenWindow", parameters = Aeson.object []}
+fullscreenWindow = sendCommand_ "WebDriver:FullscreenWindow"
 
-getActiveElement :: (HasCallStack, Marionette m) => m ()
-getActiveElement =
-    sendCommand_
-        Command{command = "WebDriver:GetActiveElement", parameters = Aeson.object []}
+getActiveElement :: (HasCallStack, Marionette m) => m Element
+getActiveElement = value <$> sendCommand "WebDriver:GetActiveElement"
 
-getAlertText :: (HasCallStack, Marionette m) => m ()
-getAlertText =
-    sendCommand_
-        Command{command = "WebDriver:GetAlertText", parameters = Aeson.object []}
+getAlertText :: (HasCallStack, Marionette m) => m Text
+getAlertText = value <$> sendCommand "WebDriver:GetAlertText"
 
-getCapabilities :: (HasCallStack, Marionette m) => m ()
-getCapabilities =
-    sendCommand_
-        Command{command = "WebDriver:GetCapabilities", parameters = Aeson.object []}
-
-getComputedLabel :: (HasCallStack, Marionette m) => m ()
-getComputedLabel =
-    sendCommand_
-        Command{command = "WebDriver:GetComputedLabel", parameters = Aeson.object []}
-
-getComputedRole :: (HasCallStack, Marionette m) => m ()
-getComputedRole =
-    sendCommand_
-        Command{command = "WebDriver:GetComputedRole", parameters = Aeson.object []}
-
-getCookies :: (HasCallStack, Marionette m) => m ()
-getCookies =
-    sendCommand_
-        Command{command = "WebDriver:GetCookies", parameters = Aeson.object []}
-
-getCurrentURL :: (HasCallStack, Marionette m) => m Text
-getCurrentURL =
+getComputedLabel :: (HasCallStack, Marionette m) => Element -> m Text
+getComputedLabel Element{..} =
     value
         <$> sendCommand
-            Command{command = "WebDriver:GetCurrentURL", parameters = Aeson.object []}
+            Command
+                { command = "WebDriver:GetComputedLabel"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
+
+getComputedRole :: (HasCallStack, Marionette m) => Element -> m Text
+getComputedRole Element{..} =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:GetComputedRole"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
+
+getCookies :: (HasCallStack, Marionette m) => m [Cookie]
+getCookies = sendCommand "WebDriver:GetCookies"
+
+getCurrentURL :: (HasCallStack, Marionette m) => m Text
+getCurrentURL = value <$> sendCommand "WebDriver:GetCurrentURL"
 
 getElementAttribute
     :: (HasCallStack, Marionette m)
@@ -309,17 +360,29 @@ getElementAttribute attr Element{..} =
                         ]
                 }
 
-getElementCSSValue :: (HasCallStack, Marionette m) => m ()
-getElementCSSValue =
-    sendCommand_
-        Command{command = "WebDriver:GetElementCSSValue", parameters = Aeson.object []}
+getElementCSSValue
+    :: (HasCallStack, Marionette m)
+    => Element
+    -> Text
+    -> m (Maybe Text)
+getElementCSSValue Element{..} propertyName =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:GetElementCSSValue"
+                , parameters =
+                    Aeson.object
+                        [ "id" .= elementId
+                        , "propertyName" .= propertyName
+                        ]
+                }
 
 getElementProperty
     :: (HasCallStack, Marionette m)
-    => Text
-    -> Element
+    => Element
+    -> Text
     -> m (Maybe Text)
-getElementProperty prop Element{..} =
+getElementProperty Element{..} name =
     value
         <$> sendCommand
             Command
@@ -327,32 +390,26 @@ getElementProperty prop Element{..} =
                 , parameters =
                     Aeson.object
                         [ "id" .= elementId
-                        , "name" .= prop
+                        , "name" .= name
                         ]
                 }
 
-data Rect = Rect
-    { x :: Float
-    , y :: Float
-    , width :: Float
-    , height :: Float
-    }
-    deriving stock (Generic, Show, Eq)
-    deriving anyclass (FromJSON)
-
 getElementRect :: (HasCallStack, Marionette m) => Element -> m Rect
 getElementRect Element{..} =
-    either throwError pure
-        =<< sendCommand
+    sendCommand
+        Command
+            { command = "WebDriver:GetElementRect"
+            , parameters = Aeson.object ["id" .= elementId]
+            }
+
+getElementTagName :: (HasCallStack, Marionette m) => Element -> m Text
+getElementTagName Element{..} =
+    value
+        <$> sendCommand
             Command
-                { command = "WebDriver:GetElementRect"
+                { command = "WebDriver:GetElementTagName"
                 , parameters = Aeson.object ["id" .= elementId]
                 }
-
-getElementTagName :: (HasCallStack, Marionette m) => m ()
-getElementTagName =
-    sendCommand_
-        Command{command = "WebDriver:GetElementTagName", parameters = Aeson.object []}
 
 getElementText :: (HasCallStack, Marionette m) => Element -> m Text
 getElementText Element{..} =
@@ -364,66 +421,64 @@ getElementText Element{..} =
                 }
 
 getPageSource :: (HasCallStack, Marionette m) => m Text
-getPageSource =
+getPageSource = value <$> sendCommand "WebDriver:GetPageSource"
+
+getShadowRoot :: (HasCallStack, Marionette m) => Element -> m Shadow
+getShadowRoot Element{..} =
     value
         <$> sendCommand
-            Command{command = "WebDriver:GetPageSource", parameters = Aeson.object []}
+            Command
+                { command = "WebDriver:GetShadowRoot"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
 
-getShadowRoot :: (HasCallStack, Marionette m) => m ()
-getShadowRoot =
-    sendCommand_
-        Command{command = "WebDriver:GetShadowRoot", parameters = Aeson.object []}
-
-getTimeouts :: (HasCallStack, Marionette m) => m ()
-getTimeouts =
-    sendCommand_
-        Command{command = "WebDriver:GetTimeouts", parameters = Aeson.object []}
+getTimeouts :: (HasCallStack, Marionette m) => m Timeouts
+getTimeouts = sendCommand "WebDriver:GetTimeouts"
 
 getTitle :: (HasCallStack, Marionette m) => m Text
-getTitle =
+getTitle = value <$> sendCommand "WebDriver:GetTitle"
+
+getWindowHandle :: (HasCallStack, Marionette m) => m WindowHandle
+getWindowHandle = value <$> sendCommand "WebDriver:GetWindowHandle"
+
+getWindowHandles :: (HasCallStack, Marionette m) => m [WindowHandle]
+getWindowHandles = sendCommand "WebDriver:GetWindowHandles"
+
+getWindowRect :: (HasCallStack, Marionette m) => m Rect
+getWindowRect = sendCommand "WebDriver:GetWindowRect"
+
+isElementDisplayed :: (HasCallStack, Marionette m) => Element -> m Bool
+isElementDisplayed Element{..} =
     value
         <$> sendCommand
-            Command{command = "WebDriver:GetTitle", parameters = Aeson.object []}
+            Command
+                { command = "WebDriver:IsElementDisplayed"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
 
-getWindowHandle :: (HasCallStack, Marionette m) => m ()
-getWindowHandle =
-    sendCommand_
-        Command{command = "WebDriver:GetWindowHandle", parameters = Aeson.object []}
+isElementEnabled :: (HasCallStack, Marionette m) => Element -> m Bool
+isElementEnabled Element{..} =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:IsElementEnabled"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
 
-getWindowHandles :: (HasCallStack, Marionette m) => m ()
-getWindowHandles =
-    sendCommand_
-        Command{command = "WebDriver:GetWindowHandles", parameters = Aeson.object []}
-
-getWindowRect :: (HasCallStack, Marionette m) => m ()
-getWindowRect =
-    sendCommand_
-        Command{command = "WebDriver:GetWindowRect", parameters = Aeson.object []}
-
-isElementDisplayed :: (HasCallStack, Marionette m) => m ()
-isElementDisplayed =
-    sendCommand_
-        Command{command = "WebDriver:IsElementDisplayed", parameters = Aeson.object []}
-
-isElementEnabled :: (HasCallStack, Marionette m) => m ()
-isElementEnabled =
-    sendCommand_
-        Command{command = "WebDriver:IsElementEnabled", parameters = Aeson.object []}
-
-isElementSelected :: (HasCallStack, Marionette m) => m ()
-isElementSelected =
-    sendCommand_
-        Command{command = "WebDriver:IsElementSelected", parameters = Aeson.object []}
-
-minimizeWindow :: (HasCallStack, Marionette m) => m ()
-minimizeWindow =
-    sendCommand_
-        Command{command = "WebDriver:MinimizeWindow", parameters = Aeson.object []}
+isElementSelected :: (HasCallStack, Marionette m) => Element -> m Bool
+isElementSelected Element{..} =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebDriver:IsElementSelected"
+                , parameters = Aeson.object ["id" .= elementId]
+                }
 
 maximizeWindow :: (HasCallStack, Marionette m) => m ()
-maximizeWindow =
-    sendCommand_
-        Command{command = "WebDriver:MaximizeWindow", parameters = Aeson.object []}
+maximizeWindow = sendCommand_ "WebDriver:MaximizeWindow"
+
+minimizeWindow :: (HasCallStack, Marionette m) => m ()
+minimizeWindow = sendCommand_ "WebDriver:MinimizeWindow"
 
 navigate :: (HasCallStack, Marionette m) => Text -> m ()
 navigate url =
@@ -434,87 +489,185 @@ navigate url =
             }
 
 newSession :: (HasCallStack, Marionette m) => m ()
-newSession =
-    sendCommand_
-        Command{command = "WebDriver:NewSession", parameters = Aeson.object []}
+newSession = sendCommand_ "WebDriver:NewSession"
 
-newWindow :: (HasCallStack, Marionette m) => m ()
+newWindow :: (HasCallStack, Marionette m) => m NewWindowResult
 newWindow =
-    sendCommand_
-        Command{command = "WebDriver:NewWindow", parameters = Aeson.object []}
+    sendCommand
+        Command
+            { command = "WebDriver:NewWindow"
+            , parameters = Aeson.object ["type" .= Window]
+            }
+
+newTab :: (HasCallStack, Marionette m) => m NewWindowResult
+newTab =
+    sendCommand
+        Command
+            { command = "WebDriver:NewWindow"
+            , parameters = Aeson.object ["type" .= Tab]
+            }
 
 performActions :: (HasCallStack, Marionette m) => m ()
-performActions =
-    sendCommand_
-        Command{command = "WebDriver:PerformActions", parameters = Aeson.object []}
+performActions = sendCommand_ "WebDriver:PerformActions"
 
 print :: (HasCallStack, Marionette m) => m ()
-print =
-    sendCommand_ Command{command = "WebDriver:Print", parameters = Aeson.object []}
+print = sendCommand_ "WebDriver:Print"
 
 refresh :: (HasCallStack, Marionette m) => m ()
-refresh =
-    sendCommand_
-        Command{command = "WebDriver:Refresh", parameters = Aeson.object []}
+refresh = sendCommand_ "WebDriver:Refresh"
 
 releaseActions :: (HasCallStack, Marionette m) => m ()
-releaseActions =
-    sendCommand_
-        Command{command = "WebDriver:ReleaseActions", parameters = Aeson.object []}
+releaseActions = sendCommand_ "WebDriver:ReleaseActions"
 
-sendAlertText :: (HasCallStack, Marionette m) => m ()
-sendAlertText =
+sendAlertText :: (HasCallStack, Marionette m) => Text -> m ()
+sendAlertText text =
     sendCommand_
-        Command{command = "WebDriver:SendAlertText", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:SendAlertText"
+            , parameters = Aeson.object ["text" .= text]
+            }
 
 setPermission :: (HasCallStack, Marionette m) => m ()
-setPermission =
-    sendCommand_
-        Command{command = "WebDriver:SetPermission", parameters = Aeson.object []}
+setPermission = sendCommand_ "WebDriver:SetPermission"
 
-setTimeouts :: (HasCallStack, Marionette m) => m ()
-setTimeouts =
+setTimeouts :: (HasCallStack, Marionette m) => Timeouts -> m ()
+setTimeouts timeouts =
     sendCommand_
-        Command{command = "WebDriver:SetTimeouts", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:SetTimeouts"
+            , parameters = toJSON timeouts
+            }
 
-setWindowRect :: (HasCallStack, Marionette m) => m ()
-setWindowRect =
+setWindowRect :: (HasCallStack, Marionette m) => Rect -> m ()
+setWindowRect rect =
     sendCommand_
-        Command{command = "WebDriver:SetWindowRect", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:SetWindowRect"
+            , parameters = toJSON rect
+            }
 
-switchToFrame :: (HasCallStack, Marionette m) => m ()
-switchToFrame =
+switchToFrame :: (HasCallStack, Marionette m) => Frame -> m ()
+switchToFrame frame =
     sendCommand_
-        Command{command = "WebDriver:SwitchToFrame", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:SwitchToFrame"
+            , parameters = toJSON frame
+            }
 
 switchToParentFrame :: (HasCallStack, Marionette m) => m ()
-switchToParentFrame =
-    sendCommand_
-        Command{command = "WebDriver:SwitchToParentFrame", parameters = Aeson.object []}
+switchToParentFrame = sendCommand_ "WebDriver:SwitchToParentFrame"
 
-switchToWindow :: (HasCallStack, Marionette m) => m ()
-switchToWindow =
+switchToWindow :: (HasCallStack, Marionette m) => WindowHandle -> m ()
+switchToWindow window =
     sendCommand_
-        Command{command = "WebDriver:SwitchToWindow", parameters = Aeson.object []}
+        Command
+            { command = "WebDriver:SwitchToWindow"
+            , parameters = toJSON window
+            }
 
-takeScreenshot :: (HasCallStack, Marionette m, MonadThrow m) => m ByteString
+takeScreenshot :: (HasCallStack, Marionette m) => m ByteString
 takeScreenshot =
-    either (throwM . AssertionFailed) (pure . Base64.decodeLenient)
-        . Aeson.parseEither (Aeson.withText "value" $ pure . Text.encodeUtf8)
-        =<< either throwError pure
-        =<< sendCommand
+    Base64.decodeLenient
+        . Text.encodeUtf8
+        . value
+        <$> sendCommand
             Command
                 { command = "WebDriver:TakeScreenshot"
                 , parameters = Aeson.object []
                 }
 
---   // WebAuthn
---   "WebAuthn:AddVirtualAuthenticator":
---     GeckoDriver.prototype.addVirtualAuthenticator,
---   "WebAuthn:RemoveVirtualAuthenticator":
---     GeckoDriver.prototype.removeVirtualAuthenticator,
---   "WebAuthn:AddCredential": GeckoDriver.prototype.addCredential,
---   "WebAuthn:GetCredentials": GeckoDriver.prototype.getCredentials,
---   "WebAuthn:RemoveCredential": GeckoDriver.prototype.removeCredential,
---   "WebAuthn:RemoveAllCredentials": GeckoDriver.prototype.removeAllCredentials,
---   "WebAuthn:SetUserVerified": GeckoDriver.prototype.setUserVerified,
+addCredential
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> Credential
+    -> m ()
+addCredential authenticatorId credential =
+    sendCommand_
+        Command
+            { command = "WebAuthn:AddCredential"
+            , parameters =
+                Aeson.Object . mconcat $
+                    [ Object.fromList ["authenticatorId" .= authenticatorId]
+                    , case toJSON credential of
+                        Aeson.Object o -> o
+                        _ -> mempty
+                    ]
+            }
+
+addVirtualAuthenticator
+    :: (HasCallStack, Marionette m)
+    => VirtualAuthenticator
+    -> m AuthenticatorId
+addVirtualAuthenticator authenticator =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebAuthn:AddVirtualAuthenticator"
+                , parameters = toJSON authenticator
+                }
+
+getCredentials
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> m [Credential]
+getCredentials authenticatorId =
+    value
+        <$> sendCommand
+            Command
+                { command = "WebAuthn:GetCredentials"
+                , parameters = Aeson.object ["authenticatorId" .= authenticatorId]
+                }
+
+removeAllCredentials
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> m ()
+removeAllCredentials authenticatorId =
+    sendCommand_
+        Command
+            { command = "WebAuthn:RemoveAllCredentials"
+            , parameters = Aeson.object ["authenticatorId" .= authenticatorId]
+            }
+
+removeCredential
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> CredentialId
+    -> m ()
+removeCredential authenticatorId credentialId =
+    sendCommand_
+        Command
+            { command = "WebAuthn:RemoveCredential"
+            , parameters =
+                Aeson.object
+                    [ "authenticatorId" .= authenticatorId
+                    , "credentialId" .= credentialId
+                    ]
+            }
+
+removeVirtualAuthenticator
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> m ()
+removeVirtualAuthenticator authenticatorId =
+    sendCommand_
+        Command
+            { command = "WebAuthn:RemoveVirtualAuthenticator"
+            , parameters = Aeson.object ["authenticatorId" .= authenticatorId]
+            }
+
+setUserVerified
+    :: (HasCallStack, Marionette m)
+    => AuthenticatorId
+    -> Bool
+    -> m ()
+setUserVerified authenticatorId verified =
+    sendCommand_
+        Command
+            { command = "WebAuthn:SetUserVerified"
+            , parameters =
+                Aeson.object
+                    [ "authenticatorId" .= authenticatorId
+                    , "isUserVerified" .= verified
+                    ]
+            }

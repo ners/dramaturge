@@ -64,6 +64,7 @@ library
     binary-parsers,
     containers,
     exceptions,
+    hashable,
     mtl,
     network,
     network-simple,
@@ -73,7 +74,19 @@ library
 
   exposed-modules:
     Test.Marionette
+    Test.Marionette.AccessibilityProperties
     Test.Marionette.Class
     Test.Marionette.Client
     Test.Marionette.Commands
+    Test.Marionette.Context
+    Test.Marionette.Cookie
+    Test.Marionette.Element
+    Test.Marionette.Frame
+    Test.Marionette.Orientation
     Test.Marionette.Protocol
+    Test.Marionette.Rect
+    Test.Marionette.Registry
+    Test.Marionette.Selector
+    Test.Marionette.Timeouts
+    Test.Marionette.WebAuthn
+    Test.Marionette.Window

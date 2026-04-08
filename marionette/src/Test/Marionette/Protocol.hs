@@ -53,6 +53,13 @@ data Command = Command
     }
     deriving stock (Show)
 
+instance IsString Command where
+    fromString str =
+        Command
+            { command = Text.pack str
+            , parameters = Aeson.object []
+            }
+
 instance ToJSON (Message Command) where
     toJSON :: Message Command -> Value
     toJSON Message{messageId, messageContent = Command{..}} = Array [Number 0, toJSON messageId, toJSON command, parameters]
